@@ -32,15 +32,15 @@ def _sample_metadata() -> dict:
 
 def _sample_analysis() -> dict:
     return {
-        "research_question": "How can we improve software testing?",
-        "background": "Testing is critical for software quality.",
-        "method": "We propose a new testing framework.",
-        "results": "Our approach improves test coverage by 30%.",
-        "conclusions": "The framework is effective and efficient.",
-        "limitations": "Only evaluated on Python projects.",
-        "future_work": "Extend to other languages.",
         "venue": "ICSE 2023",
         "keywords": ["testing", "software quality", "automation"],
+        "executive_summary": "**TL;DR:** 新测试框架提升覆盖率30%。\n\n**一图流:** 旧方法是手动找针，新方法是磁铁吸针。",
+        "motivation": "**痛点:** 传统方法覆盖率低。\n\n**核心洞察:** 利用代码结构信息引导测试生成。",
+        "methodology": "### 直觉版\n旧方法随机生成，新方法按结构引导。\n\n### 精确版\nInput → Analyzer → Generator → Output",
+        "experiments": "**核心收益:** 覆盖率提升30%。\n\n**归因分析:** 结构引导贡献最大。",
+        "critical_review": "**隐性成本:** 分析阶段耗时增加2倍。\n\n**工程落地建议:** 注意大型项目的内存占用。",
+        "mechanism_transfer": "### 机制解耦\n结构引导生成可迁移到其他领域。\n\n### 迁移处方\n可用于API测试生成。",
+        "background_context": None,
     }
 
 
@@ -171,13 +171,14 @@ def test_write_paper_note_creates_file(tmp_path: Path) -> None:
     assert path.parent.name == "2023"
 
     # Check body sections are present
-    assert "## Research Question" in content
-    assert "## Background" in content
-    assert "## Method" in content
-    assert "## Results" in content
-    assert "## Conclusions" in content
-    assert "## Limitations" in content
-    assert "## Future Work" in content
+    assert "## 核心速览 (Executive Summary)" in content
+    assert "## 动机与第一性原理" in content
+    assert "## 方法详解 (Methodology)" in content
+    assert "## 实验与归因" in content
+    assert "## 专家批判 (Critical Review)" in content
+    assert "## 机制迁移分析" in content
+    # background_context is None, should not appear
+    assert "背景知识补充" not in content
 
 
 def test_write_paper_note_skip_duplicate(tmp_path: Path) -> None:

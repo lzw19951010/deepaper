@@ -44,8 +44,8 @@ def _write_paper_note(papers_dir: Path, arxiv_id: str = "2301.00001", date: str 
     note.write_text(
         f"---\narxiv_id: {arxiv_id}\ntitle: Test Paper\ndate: {date}\n"
         "tags:\n- ml\nkeywords:\n- testing\n---\n\n"
-        "## Research Question\nHow does X work?\n\n"
-        "## Method\nWe use Y approach.\n",
+        "## 核心速览 (Executive Summary)\n\n**TL;DR:** X solves Y.\n\n"
+        "## 方法详解 (Methodology)\n\nWe use Y approach.\n",
         encoding="utf-8",
     )
     return note

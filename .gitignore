@@ -41,5 +41,9 @@ env/
 .DS_Store
 Thumbs.db
 
-# OMC planning artifacts (keep specs and plans, ignore state)
+# OMC: keep plans/specs/memory, ignore ephemeral state and sessions
 .omc/state/
+.omc/sessions/
+
+# Claude Code: keep project settings, ignore local machine config
+.claude/settings.local.json

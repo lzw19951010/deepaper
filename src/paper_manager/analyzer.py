@@ -57,17 +57,19 @@ def _extract_json(text: str) -> dict:
 
 
 ANALYSIS_JSON_SCHEMA = """\
-Respond with ONLY a JSON object (no markdown, no explanation) with these fields:
+请输出一个 JSON 对象（不要 markdown 代码块，不要多余解释），包含以下字段。
+分析字段的值为完整的 Markdown 文本（可包含子标题、表格、代码块等富格式）。
+
 {
-  "research_question": "Core research question (1-3 sentences)",
-  "background": "Background context and motivation (2-4 sentences)",
-  "method": "Proposed approach/methodology (3-6 sentences)",
-  "results": "Key quantitative and qualitative results (3-5 sentences)",
-  "conclusions": "Main conclusions and contributions (2-4 sentences)",
-  "limitations": "Acknowledged limitations, or null",
-  "future_work": "Future research directions, or null",
-  "venue": "Publication venue (e.g. NeurIPS 2023), or null",
-  "keywords": ["keyword1", "keyword2", "...5-10 technical keywords"]
+  "venue": "发表场所 (如 NeurIPS 2023)，未找到则为 null",
+  "keywords": ["关键词1", "关键词2", "...5-10个技术关键词"],
+  "executive_summary": "核心速览的完整 Markdown 文本（含 TL;DR、一图流、核心机制一句话）",
+  "motivation": "动机与第一性原理的完整 Markdown 文本（含痛点、核心洞察、直觉解释）",
+  "methodology": "方法详解的完整 Markdown 文本（含直觉版、精确版、设计决策、易混淆点）",
+  "experiments": "实验与归因的完整 Markdown 文本（含核心收益、归因分析、可信度检查）",
+  "critical_review": "专家批判的完整 Markdown 文本（含隐性成本、工程落地建议、关联思考）",
+  "mechanism_transfer": "机制迁移分析的完整 Markdown 文本（含机制解耦、迁移处方、机制家族图谱）",
+  "background_context": "背景知识补充的 Markdown 文本，如不需要则为 null"
 }"""
 
 

@@ -377,17 +377,18 @@ def tag(
 
         # Build analysis dict for tag generation from frontmatter + body sections
         analysis: dict = {
-            "research_question": str(fm.get("research_question", "")),
+            "research_question": "",
             "method": "",
             "keywords": fm.get("keywords", []),
         }
 
-        rq_match = re.search(r"## Research Question\n(.+?)(?=\n##|\Z)", body, re.DOTALL)
-        if rq_match:
-            analysis["research_question"] = rq_match.group(1).strip()
-        method_match = re.search(r"## Method\n(.+?)(?=\n##|\Z)", body, re.DOTALL)
+        # Extract from new-format sections
+        es_match = re.search(r"## 核心速览.*?\n(.+?)(?=\n---|\n## |\Z)", body, re.DOTALL)
+        if es_match:
+            analysis["research_question"] = es_match.group(1).strip()
+        method_match = re.search(r"## 方法详解.*?\n(.+?)(?=\n---|\n## |\Z)", body, re.DOTALL)
         if method_match:
-            analysis["method"] = method_match.group(1).strip()
+            analysis["method"] = method_match.group(1).strip()[:500]
 
         try:
             new_tags = generate_tags(analysis, config)
