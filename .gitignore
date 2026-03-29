@@ -1,0 +1,45 @@
+# User config (contains API keys — NEVER commit)
+config.yaml
+
+# ChromaDB vector database (local only, not synced)
+.chromadb/
+
+# Python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Obsidian per-machine config
+.obsidian/
+
+# Temporary PDF downloads (intermediate artifacts)
+tmp/
+*.pdf
+
+# Environment files
+.env
+.env.*
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# OMC planning artifacts (keep specs and plans, ignore state)
+.omc/state/
