@@ -1,0 +1,37 @@
+# paper-manager configuration
+# Copy this file to config.yaml and fill in your values.
+# config.yaml is gitignored — your API key will NOT be committed.
+#
+# Alternative: set ANTHROPIC_API_KEY as an environment variable
+# (env var takes priority over this file).
+
+# --- Required ---
+
+# Anthropic API key (https://console.anthropic.com/)
+anthropic_api_key: ""
+
+# GitHub/GitLab remote URL for syncing your paper notes
+# Example: "https://github.com/username/my-papers.git"
+git_remote: ""
+
+# --- Model selection ---
+
+# Primary model for full paper analysis (default: Claude Opus per spec)
+# Switch to claude-sonnet-4-5-20250514 for ~5-10x cost savings
+# Opus cost estimate: ~$0.05-0.15 per paper
+# Sonnet cost estimate: ~$0.01-0.03 per paper
+model: "claude-opus-4-6"
+
+# Secondary model for auto-tagging (set to same as model for uniform quality)
+tag_model: "claude-opus-4-6"
+
+# --- Optional ---
+
+# Directory where parsed paper notes are stored (relative to project root)
+papers_dir: "papers"
+
+# Prompt template to use (filename without extension in templates/)
+template: "default"
+
+# ChromaDB vector database directory (gitignored, local only)
+chromadb_dir: ".chromadb"

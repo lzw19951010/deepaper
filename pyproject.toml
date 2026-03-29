@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paper-manager"
+version = "0.1.0"
+description = "Personal arxiv paper manager: download, analyze with Claude Opus, search with ChromaDB"
+requires-python = ">=3.10"
+dependencies = [
+    "typer[all]>=0.9",
+    "anthropic>=0.40",
+    "chromadb>=0.4",
+    "gitpython>=3.1",
+    "pyyaml>=6.0",
+    "pdfplumber>=0.10",
+    "httpx>=0.25",
+    "sentence-transformers>=2.2",
+]
+
+[project.scripts]
+paper-manager = "paper_manager.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
