@@ -444,28 +444,21 @@ def config_cmd() -> None:
     typer.echo(f"  chromadb_dir:  {config.chromadb_dir}")
     typer.echo(f"  git_remote:    {config.git_remote or '(not set)'}")
 
-    key = config.api_key
-    if len(key) > 12:
-        masked = key[:8] + "..." + key[-4:]
-    else:
-        masked = "***"
-    typer.echo(f"  api_key:       {masked}")
+    typer.echo(f"  backend:       Claude Code CLI (Max subscription)")
 
-    # Validate API key with a minimal test call
-    typer.echo("\nValidating API key...")
+    # Validate Claude Code CLI is available
+    typer.echo("\nValidating Claude Code CLI...")
     try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=config.api_key)
-        client.messages.create(
-            model=config.tag_model,
-            max_tokens=1,
-            messages=[{"role": "user", "content": "ping"}],
+        import subprocess
+        result = subprocess.run(
+            ["claude", "-p", "respond with exactly: OK", "--output-format", "text"],
+            capture_output=True, text=True, timeout=30,
         )
-        typer.echo("  API key: valid")
-    except anthropic.AuthenticationError:
-        typer.echo(
-            "  API key: INVALID — check your key in config.yaml",
-            err=True,
-        )
+        if result.returncode == 0 and "OK" in result.stdout:
+            typer.echo("  Claude Code CLI: available")
+        else:
+            typer.echo("  Claude Code CLI: error — check your installation", err=True)
+    except FileNotFoundError:
+        typer.echo("  Claude Code CLI: not found — install Claude Code first", err=True)
     except Exception as exc:
-        typer.echo(f"  API key: could not validate — {exc}", err=True)
+        typer.echo(f"  Claude Code CLI: could not validate — {exc}", err=True)

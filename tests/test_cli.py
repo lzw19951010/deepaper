@@ -395,36 +395,28 @@ class TestTag:
 class TestConfigCmd:
     def test_config_shows_settings(self, tmp_path: Path) -> None:
         cfg = _make_config(tmp_path)
-        cfg.api_key = "sk-ant-test-key-1234"
+
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout = "OK"
 
         with (
             patch("paper_manager.config.load_config", return_value=cfg),
-            patch("anthropic.Anthropic", return_value=MagicMock()),
+            patch("subprocess.run", return_value=mock_proc),
         ):
             result = runner.invoke(app, ["config"])
 
         assert result.exit_code == 0
         assert "claude-opus-4-6" in result.output
-        # First 8 chars and last 4 should appear, but not the full key
-        assert "sk-ant-t" in result.output
-        assert "1234" in result.output
-        assert "sk-ant-test-key-1234" not in result.output
+        assert "Claude Code CLI" in result.output
 
     def test_config_api_error_reported(self, tmp_path: Path) -> None:
-        """A failed API call should report 'could not validate'."""
+        """A failed CLI check should report 'could not validate'."""
         cfg = _make_config(tmp_path)
-        cfg.api_key = "bad-key-123456789012"
 
         with (
             patch("paper_manager.config.load_config", return_value=cfg),
-            patch(
-                "anthropic.Anthropic",
-                return_value=MagicMock(
-                    messages=MagicMock(
-                        create=MagicMock(side_effect=Exception("connection error"))
-                    )
-                ),
-            ),
+            patch("subprocess.run", side_effect=Exception("connection error")),
         ):
             result = runner.invoke(app, ["config"])
 
