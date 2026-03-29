@@ -155,18 +155,21 @@ def write_paper_note(
         "status": analysis.get("status", "complete"),
     }
 
-    limitations = analysis.get("limitations") or "_Not discussed_"
-    future_work = analysis.get("future_work") or "_Not discussed_"
+    sections = [
+        ("核心速览 (Executive Summary)", analysis.get("executive_summary")),
+        ("动机与第一性原理 (Motivation & First Principles)", analysis.get("motivation")),
+        ("方法详解 (Methodology)", analysis.get("methodology")),
+        ("实验与归因 (Experiments & Attribution)", analysis.get("experiments")),
+        ("专家批判 (Critical Review)", analysis.get("critical_review")),
+        ("机制迁移分析 (Mechanism Transfer Analysis)", analysis.get("mechanism_transfer")),
+        ("背景知识补充 (Background Context)", analysis.get("background_context")),
+    ]
 
-    body = (
-        f"## Research Question\n{analysis['research_question']}\n\n"
-        f"## Background\n{analysis['background']}\n\n"
-        f"## Method\n{analysis['method']}\n\n"
-        f"## Results\n{analysis['results']}\n\n"
-        f"## Conclusions\n{analysis['conclusions']}\n\n"
-        f"## Limitations\n{limitations}\n\n"
-        f"## Future Work\n{future_work}\n"
-    )
+    body_parts = []
+    for heading, content in sections:
+        if content:
+            body_parts.append(f"## {heading}\n\n{content}")
+    body = "\n\n---\n\n".join(body_parts) + "\n"
 
     yaml_content = yaml.dump(
         frontmatter, default_flow_style=False, allow_unicode=True

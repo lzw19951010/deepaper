@@ -84,7 +84,7 @@ def fetch_metadata(arxiv_id: str) -> dict:
         ValueError: If the arxiv ID is not found.
         httpx.HTTPError: On unrecoverable HTTP errors.
     """
-    api_url = f"http://export.arxiv.org/api/query?id_list={arxiv_id}"
+    api_url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
 
     last_exc: Exception | None = None
     for attempt in range(3):

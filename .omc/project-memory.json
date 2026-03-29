@@ -1,0 +1,204 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1774809814108,
+  "projectRoot": "C:\\Users\\LeopoldPC\\paper_project",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "pyproject.toml"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "pytest",
+    "lintCommand": "ruff check",
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "src",
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1774809814093,
+      "keyFiles": []
+    },
+    "templates": {
+      "path": "templates",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1774809814093,
+      "keyFiles": [
+        "default.md"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 5,
+      "lastAccessed": 1774809814094,
+      "keyFiles": [
+        "conftest.py",
+        "test_analyzer.py",
+        "test_downloader.py",
+        "test_search.py",
+        "test_writer.py"
+      ]
+    },
+    "tmp": {
+      "path": "tmp",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1774809814094,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "tests\\test_analyzer.py",
+      "accessCount": 10,
+      "lastAccessed": 1774810514182,
+      "type": "file"
+    },
+    {
+      "path": "tests\\test_cli.py",
+      "accessCount": 6,
+      "lastAccessed": 1774811051841,
+      "type": "file"
+    },
+    {
+      "path": "src\\paper_manager\\analyzer.py",
+      "accessCount": 4,
+      "lastAccessed": 1774811061973,
+      "type": "file"
+    },
+    {
+      "path": "src\\paper_manager\\search.py",
+      "accessCount": 4,
+      "lastAccessed": 1774811062191,
+      "type": "file"
+    },
+    {
+      "path": "src\\paper_manager\\config.py",
+      "accessCount": 3,
+      "lastAccessed": 1774810865796,
+      "type": "file"
+    },
+    {
+      "path": "src\\paper_manager",
+      "accessCount": 3,
+      "lastAccessed": 1774810875226,
+      "type": "directory"
+    },
+    {
+      "path": "src\\paper_manager\\templates.py",
+      "accessCount": 3,
+      "lastAccessed": 1774810880013,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 3,
+      "lastAccessed": 1774810936299,
+      "type": "directory"
+    },
+    {
+      "path": "src\\paper_manager\\cli.py",
+      "accessCount": 2,
+      "lastAccessed": 1774810865144,
+      "type": "file"
+    },
+    {
+      "path": "src\\paper_manager\\writer.py",
+      "accessCount": 2,
+      "lastAccessed": 1774810866690,
+      "type": "file"
+    },
+    {
+      "path": "src\\paper_manager\\downloader.py",
+      "accessCount": 2,
+      "lastAccessed": 1774810879792,
+      "type": "file"
+    },
+    {
+      "path": "src\\paper_manager\\sync.py",
+      "accessCount": 2,
+      "lastAccessed": 1774810880714,
+      "type": "file"
+    },
+    {
+      "path": "src\\paper_manager\\__init__.py",
+      "accessCount": 2,
+      "lastAccessed": 1774810899632,
+      "type": "file"
+    },
+    {
+      "path": "config.yaml.example",
+      "accessCount": 2,
+      "lastAccessed": 1774822082785,
+      "type": "file"
+    },
+    {
+      "path": "tests\\test_search.py",
+      "accessCount": 1,
+      "lastAccessed": 1774809896964,
+      "type": "file"
+    },
+    {
+      "path": "tests\\test_writer.py",
+      "accessCount": 1,
+      "lastAccessed": 1774810171779,
+      "type": "file"
+    },
+    {
+      "path": "pyproject.toml",
+      "accessCount": 1,
+      "lastAccessed": 1774810269540,
+      "type": "file"
+    },
+    {
+      "path": "tests\\conftest.py",
+      "accessCount": 1,
+      "lastAccessed": 1774810509730,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1774810698267,
+      "type": "file"
+    },
+    {
+      "path": "tests",
+      "accessCount": 1,
+      "lastAccessed": 1774811069672,
+      "type": "directory"
+    }
+  ],
+  "userDirectives": []
+}
