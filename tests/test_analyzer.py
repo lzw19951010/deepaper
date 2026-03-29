@@ -1,31 +1,29 @@
 """Tests for paper_manager.analyzer module."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import subprocess
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_config(api_key="test-key", model="claude-opus-4-6", tag_model="claude-opus-4-6"):
+def _make_config():
     cfg = MagicMock()
-    cfg.api_key = api_key
-    cfg.model = model
-    cfg.tag_model = tag_model
     return cfg
 
 
-def _make_tool_use_response(tool_name: str, input_data: dict):
-    """Build a mock anthropic messages response with a single tool_use block."""
-    block = MagicMock()
-    block.type = "tool_use"
-    block.name = tool_name
-    block.input = input_data
-
-    response = MagicMock()
-    response.content = [block]
-    return response
+def _mock_claude_response(data: dict):
+    """Build a mock subprocess.CompletedProcess returning JSON."""
+    result = MagicMock(spec=subprocess.CompletedProcess)
+    result.returncode = 0
+    result.stdout = json.dumps(data)
+    result.stderr = ""
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -35,7 +33,7 @@ def _make_tool_use_response(tool_name: str, input_data: dict):
 class TestGetPageCount:
     def test_get_page_count(self, tmp_path: Path):
         pdf_path = tmp_path / "test.pdf"
-        pdf_path.write_bytes(b"%PDF-1.4 placeholder")  # content doesn't matter; pdfplumber is mocked
+        pdf_path.write_bytes(b"%PDF-1.4 placeholder")
 
         mock_page = MagicMock()
         mock_pdf = MagicMock()
@@ -51,8 +49,8 @@ class TestGetPageCount:
 
 
 class TestAnalyzePaper:
-    def test_analyze_paper_uses_pdf_mode_for_small_paper(self, tmp_path: Path):
-        """When pages <= 100 and size <= 30 MB, content must include a base64 document block."""
+    def test_analyze_paper_uses_text_mode_for_small_paper(self, tmp_path: Path):
+        """analyze_paper extracts text and sends to Claude CLI."""
         pdf_path = tmp_path / "small.pdf"
         pdf_path.write_bytes(b"%PDF-1.4 placeholder")
 
@@ -65,32 +63,25 @@ class TestAnalyzePaper:
             "keywords": ["ml", "nlp"],
         }
 
-        mock_response = _make_tool_use_response("extract_paper_analysis", expected_analysis)
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_response
+        mock_response = _mock_claude_response(expected_analysis)
 
         with (
-            patch("paper_manager.analyzer.get_page_count", return_value=10),
-            patch("paper_manager.analyzer.get_file_size_mb", return_value=1.0),
-            patch("paper_manager.analyzer.anthropic.Anthropic", return_value=mock_client),
+            patch("paper_manager.analyzer.extract_text", return_value="paper text here"),
+            patch("paper_manager.analyzer.subprocess.run", return_value=mock_response) as mock_run,
         ):
             from paper_manager.analyzer import analyze_paper
             result = analyze_paper(pdf_path, "Analyze this paper.", _make_config())
 
-        call_kwargs = mock_client.messages.create.call_args
-        messages = call_kwargs.kwargs["messages"]
-        user_content = messages[0]["content"]
-
-        # Verify a document block with base64 source is present
-        doc_blocks = [b for b in user_content if isinstance(b, dict) and b.get("type") == "document"]
-        assert len(doc_blocks) == 1
-        assert doc_blocks[0]["source"]["type"] == "base64"
-        assert doc_blocks[0]["source"]["media_type"] == "application/pdf"
+        # Verify subprocess was called with claude CLI
+        call_args = mock_run.call_args
+        assert call_args[0][0][0] == "claude"
+        assert "-p" in call_args[0][0]
+        assert "paper text here" in call_args[0][0][2]
 
         assert result == expected_analysis
 
     def test_analyze_paper_uses_text_mode_for_large_paper(self, tmp_path: Path):
-        """When page count > 100, content must be plain text (no document block)."""
+        """Large paper text is truncated."""
         pdf_path = tmp_path / "large.pdf"
         pdf_path.write_bytes(b"%PDF-1.4 placeholder")
 
@@ -103,32 +94,24 @@ class TestAnalyzePaper:
             "keywords": ["ml", "nlp"],
         }
 
-        mock_response = _make_tool_use_response("extract_paper_analysis", expected_analysis)
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_response
+        long_text = "x" * 100000  # exceeds 80000 char limit
+        mock_response = _mock_claude_response(expected_analysis)
 
         with (
-            patch("paper_manager.analyzer.get_page_count", return_value=150),
-            patch("paper_manager.analyzer.get_file_size_mb", return_value=5.0),
-            patch("paper_manager.analyzer.extract_text", return_value="paper text here"),
-            patch("paper_manager.analyzer.anthropic.Anthropic", return_value=mock_client),
+            patch("paper_manager.analyzer.extract_text", return_value=long_text),
+            patch("paper_manager.analyzer.subprocess.run", return_value=mock_response) as mock_run,
         ):
             from paper_manager.analyzer import analyze_paper
             result = analyze_paper(pdf_path, "Analyze this paper.", _make_config())
 
-        call_kwargs = mock_client.messages.create.call_args
-        messages = call_kwargs.kwargs["messages"]
-        user_content = messages[0]["content"]
-
-        # Verify content is a single text block (no document block)
-        assert len(user_content) == 1
-        assert user_content[0]["type"] == "text"
-        assert "paper text here" in user_content[0]["text"]
+        # Verify text was truncated in the prompt
+        prompt_sent = mock_run.call_args[0][0][2]
+        assert "[...truncated...]" in prompt_sent
 
         assert result == expected_analysis
 
     def test_analyze_paper_returns_dict(self, tmp_path: Path):
-        """analyze_paper returns the tool input dict with expected keys."""
+        """analyze_paper returns the parsed dict with expected keys."""
         pdf_path = tmp_path / "paper.pdf"
         pdf_path.write_bytes(b"%PDF-1.4 placeholder")
 
@@ -144,14 +127,11 @@ class TestAnalyzePaper:
             "venue": "NeurIPS 2023",
         }
 
-        mock_response = _make_tool_use_response("extract_paper_analysis", expected)
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_response
+        mock_response = _mock_claude_response(expected)
 
         with (
-            patch("paper_manager.analyzer.get_page_count", return_value=10),
-            patch("paper_manager.analyzer.get_file_size_mb", return_value=1.0),
-            patch("paper_manager.analyzer.anthropic.Anthropic", return_value=mock_client),
+            patch("paper_manager.analyzer.extract_text", return_value="some text"),
+            patch("paper_manager.analyzer.subprocess.run", return_value=mock_response),
         ):
             from paper_manager.analyzer import analyze_paper
             result = analyze_paper(pdf_path, "prompt", _make_config())
@@ -163,7 +143,7 @@ class TestAnalyzePaper:
 
 class TestGenerateTags:
     def test_generate_tags_returns_list(self):
-        """generate_tags returns a list of tag strings from the tool response."""
+        """generate_tags returns a list of tag strings from Claude CLI response."""
         analysis = {
             "research_question": "How does attention work?",
             "method": "We apply self-attention.",
@@ -171,19 +151,16 @@ class TestGenerateTags:
         }
         expected_tags = ["NLP", "transformer", "deep-learning"]
 
-        mock_response = _make_tool_use_response("generate_paper_tags", {"tags": expected_tags})
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_response
+        mock_response = _mock_claude_response({"tags": expected_tags})
 
-        with patch("paper_manager.analyzer.anthropic.Anthropic", return_value=mock_client):
+        with patch("paper_manager.analyzer.subprocess.run", return_value=mock_response) as mock_run:
             from paper_manager.analyzer import generate_tags
             tags = generate_tags(analysis, _make_config())
 
         assert isinstance(tags, list)
         assert tags == expected_tags
 
-        # Verify the summary was passed in the user message
-        call_kwargs = mock_client.messages.create.call_args
-        messages = call_kwargs.kwargs["messages"]
-        assert "transformer" in messages[0]["content"]
-        assert "attention" in messages[0]["content"]
+        # Verify keywords were included in the prompt
+        prompt_sent = mock_run.call_args[0][0][2]
+        assert "transformer" in prompt_sent
+        assert "attention" in prompt_sent

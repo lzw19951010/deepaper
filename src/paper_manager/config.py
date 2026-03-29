@@ -66,26 +66,17 @@ def load_config(root_dir: Path | None = None) -> Config:
         # config.yaml doesn't exist yet — user needs to run init
         pass
 
-    # Resolve API key: env var takes priority
+    # API key is optional — analysis now uses Claude Code CLI (Max subscription)
     api_key = (
         os.environ.get("ANTHROPIC_API_KEY")
         or file_config.get("anthropic_api_key", "")
     )
 
     # Warn if config.yaml is missing entirely
-    if not config_path.exists() and not api_key:
+    if not config_path.exists():
         import typer
         typer.echo(
-            "No config.yaml found and ANTHROPIC_API_KEY not set.\n"
-            "Run: paper-manager init",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    if not api_key:
-        import typer
-        typer.echo(
-            "API key not set. Set ANTHROPIC_API_KEY env var or add it to config.yaml.",
+            "No config.yaml found. Run: paper-manager init",
             err=True,
         )
         raise typer.Exit(1)
