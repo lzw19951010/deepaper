@@ -168,11 +168,19 @@ def _extract_json(text: str) -> dict:
 
 ANALYSIS_JSON_SCHEMA = """\
 请输出一个 JSON 对象（不要 markdown 代码块，不要多余解释），包含以下字段。
-分析字段的值为完整的 Markdown 文本（可包含子标题、表格、代码块等富格式）。
+结构化元数据字段为简短值，分析字段为完整的 Markdown 文本（可包含子标题、表格、代码块等富格式）。
 
 {
   "venue": "发表场所 (如 NeurIPS 2023)，未找到则为 null",
+  "publication_type": "论文类型: conference/journal/preprint/workshop/thesis 之一",
+  "doi": "DOI 标识符（如 10.xxxx/yyyy），从论文中提取，未找到则为 null",
   "keywords": ["关键词1", "关键词2", "...5-10个技术关键词"],
+  "tldr": "一句话总结论文核心贡献（≤100字，纯文本）",
+  "core_contribution": "核心贡献类型: new-method/new-dataset/new-benchmark/new-framework/survey/empirical-study/theoretical 之一或组合",
+  "baselines": ["对比的主要baseline方法名称列表"],
+  "datasets": ["使用的数据集名称列表"],
+  "metrics": ["使用的评估指标列表，如 BLEU, Recall@20, NDCG@10"],
+  "code_url": "官方代码仓库 URL，从论文中提取，未找到则为 null",
   "executive_summary": "核心速览的完整 Markdown 文本（含 TL;DR、一图流、核心机制一句话）",
   "motivation": "动机与第一性原理的完整 Markdown 文本（含痛点、核心洞察、直觉解释）",
   "methodology": "方法详解的完整 Markdown 文本（含直觉版、精确版、设计决策、易混淆点）",
@@ -236,6 +244,58 @@ def analyze_paper(pdf_path: Path, prompt: str, config) -> dict:
         shutil.rmtree(figure_dir, ignore_errors=True)
 
     return _extract_json(response)
+
+
+def classify_paper(analysis: dict, config) -> str:
+    """Classify a paper into a category using Claude Code CLI.
+
+    Reads the categories definition from templates/categories.md, then asks
+    Claude to classify the paper based on its executive_summary and keywords.
+
+    Args:
+        analysis: Analysis result dict (must contain executive_summary, keywords).
+        config: Config object (used to locate templates_path).
+
+    Returns:
+        Category string like "llm/pretraining" or "recsys/llm-as-rec".
+        Falls back to "misc" if classification fails.
+    """
+    try:
+        categories_path = config.templates_path / "categories.md"
+        categories_text = categories_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        logger.warning("Could not read categories.md: %s", exc)
+        return "misc"
+
+    keywords = analysis.get("keywords", [])
+    keywords_str = ", ".join(keywords) if isinstance(keywords, list) else str(keywords)
+
+    summary_text = analysis.get("executive_summary", "")
+    if not summary_text:
+        summary_text = f"{analysis.get('research_question', '')} {analysis.get('method', '')}"
+
+    summary = f"{summary_text} {keywords_str}".strip()
+
+    prompt = (
+        f"Based on the paper summary and the category definitions below, classify this paper.\n\n"
+        f"Paper summary and keywords:\n{summary}\n\n"
+        f"Category definitions:\n{categories_text}\n\n"
+        f'Respond with ONLY a JSON object: {{"category": "llm/pretraining"}} '
+        f"where the value is the category path relative to papers/. "
+        f"Valid top-level categories: llm, recsys, multimodal, misc. "
+        f"Use misc if unsure."
+    )
+
+    try:
+        response = _call_claude(prompt)
+        result = _extract_json(response)
+        category = result.get("category", "misc")
+        if not isinstance(category, str) or not category.strip():
+            return "misc"
+        return category.strip()
+    except Exception as exc:
+        logger.warning("Paper classification failed: %s", exc)
+        return "misc"
 
 
 def generate_tags(analysis: dict, config) -> list[str]:

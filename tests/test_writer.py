@@ -33,7 +33,15 @@ def _sample_metadata() -> dict:
 def _sample_analysis() -> dict:
     return {
         "venue": "ICSE 2023",
+        "publication_type": "conference",
+        "doi": "10.1234/test.2023",
         "keywords": ["testing", "software quality", "automation"],
+        "tldr": "A structure-guided test generation framework that improves coverage by 30%.",
+        "core_contribution": "new-method",
+        "baselines": ["EvoSuite", "Randoop"],
+        "datasets": ["Defects4J", "SF110"],
+        "metrics": ["branch coverage", "mutation score"],
+        "code_url": "https://github.com/example/test-framework",
         "executive_summary": "**TL;DR:** 新测试框架提升覆盖率30%。\n\n**一图流:** 旧方法是手动找针，新方法是磁铁吸针。",
         "motivation": "**痛点:** 传统方法覆盖率低。\n\n**核心洞察:** 利用代码结构信息引导测试生成。",
         "methodology": "### 直觉版\n旧方法随机生成，新方法按结构引导。\n\n### 精确版\nInput → Analyzer → Generator → Output",
@@ -152,7 +160,7 @@ def test_write_paper_note_creates_file(tmp_path: Path) -> None:
     analysis = _sample_analysis()
     tags = ["machine-learning", "testing"]
 
-    path = write_paper_note(analysis, metadata, tags, tmp_path)
+    path = write_paper_note(analysis, metadata, tags, tmp_path, category="llm/pretraining")
 
     assert path.exists()
     content = path.read_text(encoding="utf-8")
@@ -166,9 +174,18 @@ def test_write_paper_note_creates_file(tmp_path: Path) -> None:
     assert fm["title"] == metadata["title"]
     assert fm["tags"] == tags
     assert fm["venue"] == "ICSE 2023"
+    assert fm["category"] == "llm/pretraining"
+    assert fm["publication_type"] == "conference"
+    assert fm["doi"] == "10.1234/test.2023"
+    assert fm["tldr"] is not None
+    assert fm["baselines"] == ["EvoSuite", "Randoop"]
+    assert fm["datasets"] == ["Defects4J", "SF110"]
+    assert fm["abstract"] == metadata["abstract"]
+    assert fm["arxiv_categories"] == metadata["categories"]
 
-    # Check year-based subdirectory
-    assert path.parent.name == "2023"
+    # Check category-based subdirectory (llm/pretraining)
+    assert path.parent.name == "pretraining"
+    assert path.parent.parent.name == "llm"
 
     # Check body sections are present
     assert "## 核心速览 (Executive Summary)" in content

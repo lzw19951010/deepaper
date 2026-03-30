@@ -147,7 +147,7 @@ class TestAdd:
         (cfg.templates_path / "default.md").write_text("Analyze this.", encoding="utf-8")
 
         pdf_path = cfg.tmp_path / "2301.00001.pdf"
-        note_path = tmp_path / "papers" / "2023" / "test-paper.md"
+        note_path = tmp_path / "papers" / "llm" / "pretraining" / "test-paper.md"
 
         with (
             patch("paper_manager.config.load_config", return_value=cfg),
@@ -159,6 +159,7 @@ class TestAdd:
             patch("paper_manager.templates.render_prompt", return_value="prompt text"),
             patch("paper_manager.analyzer.analyze_paper", return_value=SAMPLE_ANALYSIS),
             patch("paper_manager.analyzer.generate_tags", return_value=["ml", "testing"]),
+            patch("paper_manager.analyzer.classify_paper", return_value="llm/pretraining"),
             patch("paper_manager.writer.write_paper_note", return_value=note_path),
             patch("paper_manager.search.get_collection", return_value=MagicMock()),
             patch("paper_manager.search.index_paper"),
@@ -167,6 +168,7 @@ class TestAdd:
 
         assert result.exit_code == 0
         assert "Done" in result.output
+        assert "llm/pretraining" in result.output
 
     def test_add_skips_existing_without_force(self, tmp_path: Path) -> None:
         """Without --force, existing papers should be skipped."""
@@ -219,6 +221,7 @@ class TestAdd:
             patch("paper_manager.templates.render_prompt", return_value="prompt"),
             patch("paper_manager.analyzer.analyze_paper", return_value=SAMPLE_ANALYSIS),
             patch("paper_manager.analyzer.generate_tags", return_value=["ml"]),
+            patch("paper_manager.analyzer.classify_paper", return_value="misc"),
             patch("paper_manager.writer.write_paper_note", mock_write),
             patch("paper_manager.search.get_collection", return_value=MagicMock()),
             patch("paper_manager.search.index_paper"),
