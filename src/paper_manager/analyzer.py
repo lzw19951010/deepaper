@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 import pdfplumber
+import pypdfium2 as pdfium
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +31,94 @@ def extract_text(pdf_path: Path) -> str:
     return "\n\n".join(pages_text)
 
 
+def extract_page_images(pdf_path: Path, pages: list[int], output_dir: Path) -> list[Path]:
+    """Render specific PDF pages as PNG images.
+
+    Args:
+        pdf_path: Path to the PDF file.
+        pages: 0-indexed page numbers to render.
+        output_dir: Directory to save the PNG files.
+
+    Returns:
+        List of paths to saved PNG files.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    pdf = pdfium.PdfDocument(str(pdf_path))
+    total = len(pdf)
+    paths = []
+    for page_idx in pages:
+        if page_idx >= total:
+            continue
+        page = pdf[page_idx]
+        bitmap = page.render(scale=1.5)
+        img = bitmap.to_pil()
+        dest = output_dir / f"page_{page_idx + 1}.jpg"
+        img.save(str(dest), "JPEG", quality=75)
+        paths.append(dest)
+    return paths
+
+
+def _detect_figure_pages(pdf_path: Path, max_pages: int = 20) -> list[int]:
+    """Detect pages containing figures/tables and rank by importance.
+
+    Uses three signals:
+    1. Bitmap images: pages where embedded image objects cover >= 10% of page area.
+    2. Vector figures: pages with graphic objects + figure/table caption.
+    3. Position weight: earlier pages (main body) scored higher than later pages
+       (appendix), since core figures tend to appear in the first ~60% of the paper.
+
+    Returns 0-indexed page numbers, capped at max_pages.
+    """
+    scored: dict[int, float] = {}
+    with pdfplumber.open(pdf_path) as pdf:
+        total_pages = len(pdf.pages)
+        for i, page in enumerate(pdf.pages):
+            text = page.extract_text() or ""
+            page_area = float(page.width) * float(page.height)
+            score = 0.0
+
+            # Signal 1: embedded bitmap images
+            imgs = page.images
+            if imgs:
+                img_area = sum(
+                    abs((im["x1"] - im["x0"]) * (im["y1"] - im["y0"]))
+                    for im in imgs
+                )
+                ratio = img_area / page_area if page_area > 0 else 0
+                if ratio >= 0.10:
+                    score += ratio
+
+            # Signal 2: vector graphics + caption
+            n_gfx = len(page.rects) + len(page.lines) + len(page.curves)
+            has_caption = bool(
+                re.search(r"(?:Figure|Fig\.|Table)\s*\d+", text)
+            )
+            if n_gfx >= 20 and has_caption:
+                score += 0.3
+            elif n_gfx >= 100:
+                score += 0.2
+
+            if score > 0:
+                # Signal 3: position weight — front 60% of paper gets bonus
+                position = i / total_pages if total_pages > 0 else 0
+                if position <= 0.6:
+                    score += 0.15  # main body bonus
+                scored[i] = score
+
+    # Sort by score descending, return top pages
+    top = sorted(scored, key=lambda p: scored[p], reverse=True)[:max_pages]
+    return sorted(top)
+
+
 def _call_claude(prompt: str) -> str:
     """Call Claude Code CLI in print mode and return the response text."""
     result = subprocess.run(
-        ["claude", "-p", prompt, "--output-format", "text"],
+        ["claude", "-p", "-", "--output-format", "text"],
+        input=prompt,
         capture_output=True,
         text=True,
-        timeout=300,
+        encoding="utf-8",
+        timeout=600,
     )
     if result.returncode != 0:
         raise RuntimeError(f"Claude CLI error: {result.stderr.strip()}")
@@ -44,16 +126,44 @@ def _call_claude(prompt: str) -> str:
 
 
 def _extract_json(text: str) -> dict:
-    """Extract a JSON object from Claude's response text."""
+    """Extract a JSON object from Claude's response text, with robust fallback."""
     # Try to find JSON in a code block first
-    match = re.search(r"```(?:json)?\s*\n(\{.*?\})\s*\n```", text, re.DOTALL)
+    match = re.search(r"```(?:json)?\s*\n(\{.*\})\s*\n```", text, re.DOTALL)
     if match:
-        return json.loads(match.group(1))
-    # Try to find a raw JSON object
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
-        return json.loads(match.group(0))
-    raise ValueError("No JSON object found in response")
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # Try to find the outermost JSON object by matching braces
+    start = text.find("{")
+    if start == -1:
+        raise ValueError("No JSON object found in response")
+
+    depth = 0
+    end = start
+    for i in range(start, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+
+    candidate = text[start:end]
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        pass
+
+    # Last resort: try to fix common JSON issues (unescaped newlines in strings)
+    fixed = candidate
+    fixed = re.sub(r'(?<!\\)\n', r'\\n', fixed)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Could not parse JSON from response: {exc}") from exc
 
 
 ANALYSIS_JSON_SCHEMA = """\
@@ -74,9 +184,11 @@ ANALYSIS_JSON_SCHEMA = """\
 
 
 def analyze_paper(pdf_path: Path, prompt: str, config) -> dict:
-    """Analyze a paper using Claude Code CLI.
+    """Analyze a paper using Claude Code CLI with text + figure images.
 
-    Extracts text from the PDF, sends it to Claude Code for analysis.
+    1. Extracts full text from the PDF.
+    2. Detects and renders key figure pages as images.
+    3. Sends text + image file paths to Claude Code for analysis.
 
     Args:
         pdf_path: Path to the PDF file.
@@ -95,8 +207,34 @@ def analyze_paper(pdf_path: Path, prompt: str, config) -> dict:
     if len(text) > max_chars:
         text = text[:max_chars] + "\n\n[...truncated...]"
 
-    full_prompt = f"{prompt}\n\n{ANALYSIS_JSON_SCHEMA}\n\n---\nPaper text:\n{text}"
+    # Extract key figure pages as images
+    figure_dir = pdf_path.parent / f"{pdf_path.stem}_figures"
+    try:
+        figure_pages = _detect_figure_pages(pdf_path)
+        image_paths = extract_page_images(pdf_path, figure_pages, figure_dir)
+    except Exception as exc:
+        logger.warning("Could not extract figure images: %s", exc)
+        image_paths = []
+
+    # Build prompt with image references
+    image_section = ""
+    if image_paths:
+        image_refs = "\n".join(
+            f"- Page {p.stem.replace('page_', '')}: {p.resolve()}"
+            for p in image_paths
+        )
+        image_section = (
+            f"\n\n---\n以下是论文关键页面的图片文件路径，请使用 Read 工具查看这些图片以分析 Figure 和 Table 的内容：\n{image_refs}\n"
+        )
+
+    full_prompt = f"{prompt}\n\n{ANALYSIS_JSON_SCHEMA}{image_section}\n\n---\nPaper text:\n{text}"
     response = _call_claude(full_prompt)
+
+    # Clean up figure images after analysis
+    if figure_dir.exists():
+        import shutil
+        shutil.rmtree(figure_dir, ignore_errors=True)
+
     return _extract_json(response)
 
 
@@ -104,11 +242,13 @@ def generate_tags(analysis: dict, config) -> list[str]:
     """Generate classification tags for a paper using Claude Code CLI."""
     keywords = analysis.get("keywords", [])
     keywords_str = ", ".join(keywords) if isinstance(keywords, list) else str(keywords)
-    summary = (
-        f"{analysis.get('research_question', '')} "
-        f"{analysis.get('method', '')} "
-        f"{keywords_str}"
-    ).strip()
+
+    # Use executive_summary if available, fall back to old fields
+    summary_text = analysis.get("executive_summary", "")
+    if not summary_text:
+        summary_text = f"{analysis.get('research_question', '')} {analysis.get('method', '')}"
+
+    summary = f"{summary_text} {keywords_str}".strip()
 
     prompt = (
         f"Generate 3-8 classification tags for this academic paper.\n\n"
