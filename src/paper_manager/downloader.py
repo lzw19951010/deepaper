@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 import time
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import httpx
@@ -12,8 +11,13 @@ logger = logging.getLogger(__name__)
 
 _last_request_time: float = 0.0
 _RATE_LIMIT_SECONDS = 3.0
-_ARXIV_NS = "http://www.w3.org/2005/Atom"
-_ARXIV_NS2 = "http://arxiv.org/schemas/atom"
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36"
+    ),
+}
 
 
 def _rate_limit() -> None:
@@ -74,7 +78,10 @@ def parse_arxiv_id(url: str) -> str:
 
 
 def fetch_metadata(arxiv_id: str) -> dict:
-    """Fetch paper metadata from the arxiv API.
+    """Fetch paper metadata from the arxiv abs page (HTML, no API).
+
+    Scrapes citation meta tags from the arxiv abstract page, which is the
+    same as visiting the page in a browser — no API rate limits apply.
 
     Args:
         arxiv_id: A bare arxiv ID such as "2301.00001".
@@ -87,77 +94,77 @@ def fetch_metadata(arxiv_id: str) -> dict:
         ValueError: If the arxiv ID is not found.
         httpx.HTTPError: On unrecoverable HTTP errors.
     """
-    api_url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
+    import re as _re
+
+    abs_url = f"https://arxiv.org/abs/{arxiv_id}"
 
     last_exc: Exception | None = None
-    for attempt in range(5):
+    for attempt in range(3):
         if attempt > 0:
-            time.sleep(3 ** attempt)  # 3s, 9s, 27s, 81s
-        _rate_limit()
+            time.sleep(2 ** attempt)
         try:
-            response = httpx.get(api_url, timeout=30.0)
-            if response.status_code == 429:
-                logger.warning("Rate limited (429), retrying in %ds...", 3 ** (attempt + 1))
-                last_exc = httpx.HTTPStatusError(
-                    f"Rate limited {response.status_code}",
-                    request=response.request,
-                    response=response,
-                )
-                continue
-            if response.status_code >= 500:
-                last_exc = httpx.HTTPStatusError(
-                    f"Server error {response.status_code}",
-                    request=response.request,
-                    response=response,
-                )
-                continue
+            response = httpx.get(abs_url, timeout=30.0, headers=_HEADERS, follow_redirects=True)
+            if response.status_code == 404:
+                raise ValueError(f"arxiv ID not found: {arxiv_id!r}")
             response.raise_for_status()
             break
         except httpx.TimeoutException as exc:
             last_exc = exc
             continue
         except httpx.HTTPStatusError as exc:
-            if exc.response.status_code in (429, 503) or exc.response.status_code >= 500:
+            if exc.response.status_code >= 500:
                 last_exc = exc
                 continue
             raise
     else:
         raise last_exc  # type: ignore[misc]
 
-    root = ET.fromstring(response.text)
-    ns = {"atom": _ARXIV_NS, "arxiv": _ARXIV_NS2}
+    html = response.text
 
-    entries = root.findall("atom:entry", ns)
-    if not entries:
-        raise ValueError(f"arxiv ID not found: {arxiv_id!r}")
+    # Extract from <meta name="citation_*"> tags
+    def _meta(name: str) -> str:
+        m = _re.search(rf'<meta\s+name="{name}"\s+content="(.+?)"', html)
+        return m.group(1).strip() if m else ""
 
-    entry = entries[0]
+    def _meta_all(name: str) -> list[str]:
+        return [m.strip() for m in _re.findall(rf'<meta\s+name="{name}"\s+content="(.+?)"', html)]
 
-    # Check for the "no results" entry arxiv returns for unknown IDs
-    title_el = entry.find("atom:title", ns)
-    title = (title_el.text or "").strip() if title_el is not None else ""
-    if title.lower() == "error":
-        raise ValueError(f"arxiv ID not found: {arxiv_id!r}")
+    title = _meta("citation_title")
+    if not title:
+        raise ValueError(f"Could not extract title for arxiv ID: {arxiv_id!r}")
 
-    authors = [
-        (name_el.text or "").strip()
-        for author_el in entry.findall("atom:author", ns)
-        for name_el in [author_el.find("atom:name", ns)]
-        if name_el is not None
-    ]
+    # Authors come as "Last, First" — convert to "First Last"
+    raw_authors = _meta_all("citation_author")
+    authors = []
+    for a in raw_authors:
+        parts = [p.strip() for p in a.split(",", 1)]
+        if len(parts) == 2:
+            authors.append(f"{parts[1]} {parts[0]}")
+        else:
+            authors.append(a)
 
-    published_el = entry.find("atom:published", ns)
-    date_raw = (published_el.text or "").strip() if published_el is not None else ""
-    date = date_raw[:10] if date_raw else ""
+    date_raw = _meta("citation_date")  # "YYYY/MM/DD"
+    date = date_raw.replace("/", "-") if date_raw else ""
 
-    abstract_el = entry.find("atom:summary", ns)
-    abstract = " ".join((abstract_el.text or "").split()) if abstract_el is not None else ""
+    # Abstract from the page
+    abs_match = _re.search(
+        r'<blockquote class="abstract[^"]*">\s*<span[^>]*>Abstract:</span>\s*(.*?)</blockquote>',
+        html,
+        _re.DOTALL,
+    )
+    abstract = ""
+    if abs_match:
+        abstract = _re.sub(r"<[^>]+>", "", abs_match.group(1)).strip()
+        abstract = " ".join(abstract.split())
 
-    categories = [
-        el.get("term", "")
-        for el in entry.findall("atom:category", ns)
-        if el.get("term")
-    ]
+    # Categories from primary-subject span
+    categories = []
+    cat_match = _re.search(r'<span class="primary-subject">([^<]+)</span>', html)
+    if cat_match:
+        # Extract short code like "cs.CL" from "Computation and Language (cs.CL)"
+        code_match = _re.search(r"\(([^)]+)\)", cat_match.group(1))
+        if code_match:
+            categories.append(code_match.group(1))
 
     return {
         "arxiv_id": arxiv_id,
@@ -166,7 +173,7 @@ def fetch_metadata(arxiv_id: str) -> dict:
         "date": date,
         "abstract": abstract,
         "categories": categories,
-        "url": f"https://arxiv.org/abs/{arxiv_id}",
+        "url": abs_url,
     }
 
 
@@ -194,7 +201,7 @@ def download_pdf(arxiv_id: str, output_dir: Path) -> Path:
             time.sleep(2 ** attempt)
         _rate_limit()
         try:
-            response = httpx.get(pdf_url, timeout=60.0, follow_redirects=True)
+            response = httpx.get(pdf_url, timeout=60.0, follow_redirects=True, headers=_HEADERS)
             if response.status_code == 404:
                 raise ValueError(f"Paper {arxiv_id} not found (404)")
             if response.status_code == 410:
