@@ -9,29 +9,24 @@ import pytest
 from paper_manager.downloader import download_pdf, fetch_metadata, parse_arxiv_id
 
 # ---------------------------------------------------------------------------
-# Sample Atom XML returned by the arxiv API
+# Sample HTML returned by the arxiv abs page
 # ---------------------------------------------------------------------------
-SAMPLE_ATOM_XML = """\
-<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"
-      xmlns:arxiv="http://arxiv.org/schemas/atom">
-  <entry>
-    <id>http://arxiv.org/abs/2301.00001v1</id>
-    <title>Test Paper: A Survey of Testing</title>
-    <author><name>Alice Smith</name></author>
-    <author><name>Bob Jones</name></author>
-    <published>2023-01-01T00:00:00Z</published>
-    <summary>This paper surveys testing methodologies in depth.</summary>
-    <category term="cs.SE" scheme="http://arxiv.org/schemas/atom"/>
-    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
-  </entry>
-</feed>
+SAMPLE_ABS_HTML = """\
+<html><head>
+<meta name="citation_title" content="Test Paper: A Survey of Testing">
+<meta name="citation_author" content="Smith, Alice">
+<meta name="citation_author" content="Jones, Bob">
+<meta name="citation_date" content="2023/01/01">
+</head><body>
+<blockquote class="abstract mathjax">
+<span class="descriptor">Abstract:</span> This paper surveys testing methodologies in depth.
+</blockquote>
+<span class="primary-subject">Software Engineering (cs.SE)</span>
+</body></html>
 """
 
-EMPTY_ATOM_XML = """\
-<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
-</feed>
+EMPTY_ABS_HTML = """\
+<html><head><title>404 Not Found</title></head><body></body></html>
 """
 
 
@@ -72,11 +67,10 @@ def _make_httpx_response(text: str, status_code: int = 200) -> MagicMock:
     return resp
 
 
-def test_fetch_metadata_parses_xml():
-    resp = _make_httpx_response(SAMPLE_ATOM_XML)
+def test_fetch_metadata_parses_html():
+    resp = _make_httpx_response(SAMPLE_ABS_HTML)
 
-    with patch("paper_manager.downloader._rate_limit"), \
-         patch("httpx.get", return_value=resp):
+    with patch("httpx.get", return_value=resp):
         meta = fetch_metadata("2301.00001")
 
     assert meta["arxiv_id"] == "2301.00001"
@@ -85,16 +79,14 @@ def test_fetch_metadata_parses_xml():
     assert meta["date"] == "2023-01-01"
     assert "surveys testing" in meta["abstract"]
     assert "cs.SE" in meta["categories"]
-    assert "cs.LG" in meta["categories"]
     assert meta["url"] == "https://arxiv.org/abs/2301.00001"
 
 
 def test_fetch_metadata_raises_on_empty_response():
-    resp = _make_httpx_response(EMPTY_ATOM_XML)
+    resp = _make_httpx_response(EMPTY_ABS_HTML)
 
-    with patch("paper_manager.downloader._rate_limit"), \
-         patch("httpx.get", return_value=resp):
-        with pytest.raises(ValueError, match="arxiv ID not found"):
+    with patch("httpx.get", return_value=resp):
+        with pytest.raises(ValueError, match="Could not extract title"):
             fetch_metadata("9999.99999")
 
 
