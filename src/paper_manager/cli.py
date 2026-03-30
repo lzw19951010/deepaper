@@ -89,7 +89,7 @@ def add(
     from paper_manager.config import load_config
     from paper_manager.downloader import parse_arxiv_id, fetch_metadata, download_pdf
     from paper_manager.templates import load_template, render_prompt
-    from paper_manager.analyzer import analyze_paper, generate_tags
+    from paper_manager.analyzer import analyze_paper, generate_tags, classify_paper
     from paper_manager.writer import find_existing, write_paper_note
     from paper_manager.search import get_collection, index_paper
 
@@ -155,11 +155,20 @@ def add(
             typer.echo(f"  Warning: tag generation failed: {exc}", err=True)
             tags = []
 
+        # Classify paper into category
+        typer.echo("  Classifying paper...")
+        try:
+            category = classify_paper(analysis, config)
+        except Exception as exc:
+            typer.echo(f"  Warning: classification failed: {exc}", err=True)
+            category = "misc"
+        typer.echo(f"  Category: {category}")
+
         # Write markdown note
         typer.echo("  Writing note...")
         try:
             note_path = write_paper_note(
-                analysis, metadata, tags, config.papers_path, force=force
+                analysis, metadata, tags, config.papers_path, force=force, category=category
             )
         except Exception as exc:
             typer.echo(f"  Error writing note: {exc}", err=True)

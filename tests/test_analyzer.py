@@ -141,6 +141,70 @@ class TestAnalyzePaper:
             assert key in result
 
 
+class TestClassifyPaper:
+    def test_classify_paper_returns_category(self, tmp_path: Path):
+        """classify_paper returns a category string from Claude CLI response."""
+        analysis = {
+            "executive_summary": "This paper presents a new pretraining method for LLMs.",
+            "keywords": ["pretraining", "scaling law", "LLM"],
+        }
+        categories_path = tmp_path / "categories.md"
+        categories_path.write_text("# Categories\nllm/pretraining — pretraining methods", encoding="utf-8")
+
+        cfg = _make_config()
+        cfg.templates_path = tmp_path
+
+        mock_response = _mock_claude_response({"category": "llm/pretraining"})
+
+        with patch("paper_manager.analyzer.subprocess.run", return_value=mock_response) as mock_run:
+            from paper_manager.analyzer import classify_paper
+            result = classify_paper(analysis, cfg)
+
+        assert result == "llm/pretraining"
+
+        # Verify the prompt included keywords and summary
+        prompt_sent = mock_run.call_args[1]["input"]
+        assert "pretraining" in prompt_sent
+
+    def test_classify_paper_falls_back_to_misc_on_failure(self, tmp_path: Path):
+        """classify_paper returns 'misc' when Claude CLI fails."""
+        analysis = {
+            "executive_summary": "Some paper.",
+            "keywords": ["foo"],
+        }
+        categories_path = tmp_path / "categories.md"
+        categories_path.write_text("# Categories", encoding="utf-8")
+
+        cfg = _make_config()
+        cfg.templates_path = tmp_path
+
+        mock_response = MagicMock(spec=subprocess.CompletedProcess)
+        mock_response.returncode = 1
+        mock_response.stderr = "error"
+        mock_response.stdout = ""
+
+        with patch("paper_manager.analyzer.subprocess.run", return_value=mock_response):
+            from paper_manager.analyzer import classify_paper
+            result = classify_paper(analysis, cfg)
+
+        assert result == "misc"
+
+    def test_classify_paper_falls_back_to_misc_when_no_categories_file(self, tmp_path: Path):
+        """classify_paper returns 'misc' when categories.md does not exist."""
+        analysis = {
+            "executive_summary": "Some paper.",
+            "keywords": ["foo"],
+        }
+
+        cfg = _make_config()
+        cfg.templates_path = tmp_path  # no categories.md here
+
+        from paper_manager.analyzer import classify_paper
+        result = classify_paper(analysis, cfg)
+
+        assert result == "misc"
+
+
 class TestGenerateTags:
     def test_generate_tags_returns_list(self):
         """generate_tags returns a list of tag strings from Claude CLI response."""
