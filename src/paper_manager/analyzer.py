@@ -110,19 +110,75 @@ def _detect_figure_pages(pdf_path: Path, max_pages: int = 20) -> list[int]:
     return sorted(top)
 
 
-def _call_claude(prompt: str) -> str:
-    """Call Claude Code CLI in print mode and return the response text."""
-    result = subprocess.run(
-        ["claude", "-p", "-", "--output-format", "text"],
-        input=prompt,
-        capture_output=True,
+def _call_claude(prompt: str, show_progress: bool = True) -> str:
+    """Call Claude Code CLI with real-time streaming progress display.
+
+    Uses stream-json format to show token count and elapsed time while
+    Claude is generating, then returns the full text result.
+    """
+    import sys
+    import time as _time
+
+    proc = subprocess.Popen(
+        ["claude", "-p", "-", "--output-format", "stream-json", "--verbose"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
         encoding="utf-8",
-        timeout=600,
     )
-    if result.returncode != 0:
-        raise RuntimeError(f"Claude CLI error: {result.stderr.strip()}")
-    return result.stdout.strip()
+
+    # Send prompt and close stdin
+    proc.stdin.write(prompt)
+    proc.stdin.close()
+
+    result_text = ""
+    output_tokens = 0
+    start = _time.monotonic()
+
+    for line in proc.stdout:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        etype = event.get("type", "")
+
+        if etype == "assistant":
+            # Extract text content and token count from assistant message
+            msg = event.get("message", {})
+            usage = msg.get("usage", {})
+            output_tokens = usage.get("output_tokens", output_tokens)
+            content = msg.get("content", [])
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    result_text = block.get("text", "")
+            if show_progress:
+                elapsed = _time.monotonic() - start
+                sys.stderr.write(f"\r    Generating... {output_tokens} tokens, {elapsed:.0f}s")
+                sys.stderr.flush()
+
+        elif etype == "result":
+            # Final result — extract text
+            final_text = event.get("result", "")
+            if final_text:
+                result_text = final_text
+            usage = event.get("usage", {})
+            output_tokens = usage.get("output_tokens", output_tokens)
+            if show_progress:
+                elapsed = _time.monotonic() - start
+                sys.stderr.write(f"\r    Done: {output_tokens} tokens in {elapsed:.0f}s          \n")
+                sys.stderr.flush()
+
+    proc.wait(timeout=30)
+    if proc.returncode != 0:
+        stderr_text = proc.stderr.read() if proc.stderr else ""
+        raise RuntimeError(f"Claude CLI error (rc={proc.returncode}): {stderr_text.strip()}")
+
+    return result_text.strip()
 
 
 def _extract_json(text: str) -> dict:

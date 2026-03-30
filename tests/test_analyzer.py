@@ -5,8 +5,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import subprocess
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -15,15 +13,6 @@ import subprocess
 def _make_config():
     cfg = MagicMock()
     return cfg
-
-
-def _mock_claude_response(data: dict):
-    """Build a mock subprocess.CompletedProcess returning JSON."""
-    result = MagicMock(spec=subprocess.CompletedProcess)
-    result.returncode = 0
-    result.stdout = json.dumps(data)
-    result.stderr = ""
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -63,20 +52,16 @@ class TestAnalyzePaper:
             "keywords": ["ml", "nlp"],
         }
 
-        mock_response = _mock_claude_response(expected_analysis)
-
         with (
             patch("paper_manager.analyzer.extract_text", return_value="paper text here"),
-            patch("paper_manager.analyzer.subprocess.run", return_value=mock_response) as mock_run,
+            patch("paper_manager.analyzer._call_claude", return_value=json.dumps(expected_analysis)) as mock_call,
         ):
             from paper_manager.analyzer import analyze_paper
             result = analyze_paper(pdf_path, "Analyze this paper.", _make_config())
 
-        # Verify subprocess was called with claude CLI via stdin
-        call_args = mock_run.call_args
-        assert call_args[0][0][0] == "claude"
-        assert "-p" in call_args[0][0]
-        assert "paper text here" in call_args[1]["input"]
+        # Verify prompt included paper text
+        prompt_sent = mock_call.call_args[0][0]
+        assert "paper text here" in prompt_sent
 
         assert result == expected_analysis
 
@@ -95,17 +80,16 @@ class TestAnalyzePaper:
         }
 
         long_text = "x" * 100000  # exceeds 80000 char limit
-        mock_response = _mock_claude_response(expected_analysis)
 
         with (
             patch("paper_manager.analyzer.extract_text", return_value=long_text),
-            patch("paper_manager.analyzer.subprocess.run", return_value=mock_response) as mock_run,
+            patch("paper_manager.analyzer._call_claude", return_value=json.dumps(expected_analysis)) as mock_call,
         ):
             from paper_manager.analyzer import analyze_paper
             result = analyze_paper(pdf_path, "Analyze this paper.", _make_config())
 
         # Verify text was truncated in the prompt
-        prompt_sent = mock_run.call_args[1]["input"]
+        prompt_sent = mock_call.call_args[0][0]
         assert "[...truncated...]" in prompt_sent
 
         assert result == expected_analysis
@@ -127,11 +111,9 @@ class TestAnalyzePaper:
             "venue": "NeurIPS 2023",
         }
 
-        mock_response = _mock_claude_response(expected)
-
         with (
             patch("paper_manager.analyzer.extract_text", return_value="some text"),
-            patch("paper_manager.analyzer.subprocess.run", return_value=mock_response),
+            patch("paper_manager.analyzer._call_claude", return_value=json.dumps(expected)),
         ):
             from paper_manager.analyzer import analyze_paper
             result = analyze_paper(pdf_path, "prompt", _make_config())
@@ -154,17 +136,12 @@ class TestClassifyPaper:
         cfg = _make_config()
         cfg.templates_path = tmp_path
 
-        mock_response = _mock_claude_response({"category": "llm/pretraining"})
-
-        with patch("paper_manager.analyzer.subprocess.run", return_value=mock_response) as mock_run:
+        with patch("paper_manager.analyzer._call_claude", return_value='{"category": "llm/pretraining"}') as mock_call:
             from paper_manager.analyzer import classify_paper
             result = classify_paper(analysis, cfg)
 
         assert result == "llm/pretraining"
-
-        # Verify the prompt included keywords and summary
-        prompt_sent = mock_run.call_args[1]["input"]
-        assert "pretraining" in prompt_sent
+        assert "pretraining" in mock_call.call_args[0][0]
 
     def test_classify_paper_falls_back_to_misc_on_failure(self, tmp_path: Path):
         """classify_paper returns 'misc' when Claude CLI fails."""
@@ -178,12 +155,7 @@ class TestClassifyPaper:
         cfg = _make_config()
         cfg.templates_path = tmp_path
 
-        mock_response = MagicMock(spec=subprocess.CompletedProcess)
-        mock_response.returncode = 1
-        mock_response.stderr = "error"
-        mock_response.stdout = ""
-
-        with patch("paper_manager.analyzer.subprocess.run", return_value=mock_response):
+        with patch("paper_manager.analyzer._call_claude", side_effect=RuntimeError("error")):
             from paper_manager.analyzer import classify_paper
             result = classify_paper(analysis, cfg)
 
@@ -215,9 +187,7 @@ class TestGenerateTags:
         }
         expected_tags = ["NLP", "transformer", "deep-learning"]
 
-        mock_response = _mock_claude_response({"tags": expected_tags})
-
-        with patch("paper_manager.analyzer.subprocess.run", return_value=mock_response) as mock_run:
+        with patch("paper_manager.analyzer._call_claude", return_value=json.dumps({"tags": expected_tags})) as mock_call:
             from paper_manager.analyzer import generate_tags
             tags = generate_tags(analysis, _make_config())
 
@@ -225,6 +195,6 @@ class TestGenerateTags:
         assert tags == expected_tags
 
         # Verify keywords were included in the prompt
-        prompt_sent = mock_run.call_args[1]["input"]
+        prompt_sent = mock_call.call_args[0][0]
         assert "transformer" in prompt_sent
         assert "attention" in prompt_sent
