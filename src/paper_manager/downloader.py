@@ -1,11 +1,14 @@
 """arxiv paper downloader with rate limiting."""
 from __future__ import annotations
 
+import logging
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 _last_request_time: float = 0.0
 _RATE_LIMIT_SECONDS = 3.0
@@ -87,12 +90,20 @@ def fetch_metadata(arxiv_id: str) -> dict:
     api_url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
 
     last_exc: Exception | None = None
-    for attempt in range(3):
+    for attempt in range(5):
         if attempt > 0:
-            time.sleep(2 ** attempt)
+            time.sleep(3 ** attempt)  # 3s, 9s, 27s, 81s
         _rate_limit()
         try:
             response = httpx.get(api_url, timeout=30.0)
+            if response.status_code == 429:
+                logger.warning("Rate limited (429), retrying in %ds...", 3 ** (attempt + 1))
+                last_exc = httpx.HTTPStatusError(
+                    f"Rate limited {response.status_code}",
+                    request=response.request,
+                    response=response,
+                )
+                continue
             if response.status_code >= 500:
                 last_exc = httpx.HTTPStatusError(
                     f"Server error {response.status_code}",
@@ -106,7 +117,7 @@ def fetch_metadata(arxiv_id: str) -> dict:
             last_exc = exc
             continue
         except httpx.HTTPStatusError as exc:
-            if exc.response.status_code >= 500:
+            if exc.response.status_code in (429, 503) or exc.response.status_code >= 500:
                 last_exc = exc
                 continue
             raise

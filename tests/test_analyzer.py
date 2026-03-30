@@ -72,11 +72,11 @@ class TestAnalyzePaper:
             from paper_manager.analyzer import analyze_paper
             result = analyze_paper(pdf_path, "Analyze this paper.", _make_config())
 
-        # Verify subprocess was called with claude CLI
+        # Verify subprocess was called with claude CLI via stdin
         call_args = mock_run.call_args
         assert call_args[0][0][0] == "claude"
         assert "-p" in call_args[0][0]
-        assert "paper text here" in call_args[0][0][2]
+        assert "paper text here" in call_args[1]["input"]
 
         assert result == expected_analysis
 
@@ -105,7 +105,7 @@ class TestAnalyzePaper:
             result = analyze_paper(pdf_path, "Analyze this paper.", _make_config())
 
         # Verify text was truncated in the prompt
-        prompt_sent = mock_run.call_args[0][0][2]
+        prompt_sent = mock_run.call_args[1]["input"]
         assert "[...truncated...]" in prompt_sent
 
         assert result == expected_analysis
@@ -161,6 +161,6 @@ class TestGenerateTags:
         assert tags == expected_tags
 
         # Verify keywords were included in the prompt
-        prompt_sent = mock_run.call_args[0][0][2]
+        prompt_sent = mock_run.call_args[1]["input"]
         assert "transformer" in prompt_sent
         assert "attention" in prompt_sent
