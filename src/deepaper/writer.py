@@ -168,6 +168,9 @@ def write_paper_note(
         "tags": tags,
         "category": category,
         "status": analysis.get("status", "complete"),
+        # --- Citation data (from Semantic Scholar) ---
+        "citation_count": analysis.get("citation_count"),
+        "citation_date": analysis.get("citation_date"),
     }
 
     sections = [

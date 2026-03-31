@@ -1,4 +1,4 @@
-"""Tests for paper_manager.downloader."""
+"""Tests for deepaper.downloader."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from paper_manager.downloader import download_pdf, fetch_metadata, parse_arxiv_id
+from deepaper.downloader import download_pdf, fetch_metadata, parse_arxiv_id
 
 # ---------------------------------------------------------------------------
 # Sample HTML returned by the arxiv abs page
@@ -96,13 +96,13 @@ def test_fetch_metadata_raises_on_empty_response():
 
 def test_rate_limiter_enforces_delay():
     """When less than 3 seconds have elapsed, sleep should be called."""
-    import paper_manager.downloader as dl
+    import deepaper.downloader as dl
 
     # Simulate last request happening 1 second ago (monotonic time)
     fake_now = 1000.0
     fake_last = fake_now - 1.0  # only 1 second elapsed → need ~2 more seconds
 
-    with patch("paper_manager.downloader._last_request_time", fake_last), \
+    with patch("deepaper.downloader._last_request_time", fake_last), \
          patch("time.monotonic", side_effect=[fake_now, fake_now + 2.0]), \
          patch("time.sleep") as mock_sleep:
         dl._rate_limit()

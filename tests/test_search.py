@@ -1,4 +1,4 @@
-"""Tests for paper_manager.search."""
+"""Tests for deepaper.search."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import chromadb
 import pytest
 
-from paper_manager.search import (
+from deepaper.search import (
     _get_embedding_function,
     chunk_document,
     index_paper,

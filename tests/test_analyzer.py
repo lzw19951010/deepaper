@@ -1,4 +1,4 @@
-"""Tests for paper_manager.analyzer module."""
+"""Tests for deepaper.analyzer module."""
 from __future__ import annotations
 
 import json
@@ -34,25 +34,25 @@ class TestExtractJson:
     """
 
     def test_plain_json(self):
-        from paper_manager.analyzer import _extract_json
+        from deepaper.analyzer import _extract_json
         data = {"venue": "NeurIPS 2023", "keywords": ["a", "b"]}
         assert _extract_json(json.dumps(data)) == data
 
     def test_json_in_code_fence(self):
-        from paper_manager.analyzer import _extract_json
+        from deepaper.analyzer import _extract_json
         data = {"venue": "ICML", "tldr": "short"}
         text = f"```json\n{json.dumps(data)}\n```"
         assert _extract_json(text) == data
 
     def test_json_in_code_fence_no_lang(self):
-        from paper_manager.analyzer import _extract_json
+        from deepaper.analyzer import _extract_json
         data = {"venue": "ICLR"}
         text = f"```\n{json.dumps(data)}\n```"
         assert _extract_json(text) == data
 
     def test_json_with_prose_before(self):
         """JSON preceded by prose — brace-matching must find the real object."""
-        from paper_manager.analyzer import _extract_json
+        from deepaper.analyzer import _extract_json
         data = {"category": "llm/pretraining"}
         text = f"Here is my analysis:\n{json.dumps(data)}"
         assert _extract_json(text) == data
@@ -65,7 +65,7 @@ class TestExtractJson:
         applied here it would corrupt the braces line and raise the
         "char 1" error.
         """
-        from paper_manager.analyzer import _extract_json
+        from deepaper.analyzer import _extract_json
         data = {
             "venue": "arXiv",
             "keywords": ["scaling", "language models"],
@@ -84,7 +84,7 @@ class TestExtractJson:
         re.sub over ALL newlines, turning structural `{\\n` into backslash+n
         which caused the "char 1" JSONDecodeError.
         """
-        from paper_manager.analyzer import _extract_json
+        from deepaper.analyzer import _extract_json
 
         # Manually build a JSON-like string with an unescaped newline inside a value
         broken = '{\n  "venue": "arXiv",\n  "executive_summary": "Line one.\nLine two."\n}'
@@ -94,13 +94,13 @@ class TestExtractJson:
         assert "Line two." in result["executive_summary"]
 
     def test_no_json_raises(self):
-        from paper_manager.analyzer import _extract_json
+        from deepaper.analyzer import _extract_json
         with pytest.raises(ValueError, match="No JSON object found"):
             _extract_json("no braces here at all")
 
     def test_fix_json_string_escapes_only_inside_strings(self):
         """_fix_json_string_escapes must leave structural newlines untouched."""
-        from paper_manager.analyzer import _fix_json_string_escapes
+        from deepaper.analyzer import _fix_json_string_escapes
 
         # Structural newline between keys — must survive unchanged
         src = '{\n  "k": "v"\n}'
@@ -124,8 +124,8 @@ class TestGetPageCount:
         mock_pdf.__enter__ = lambda s: mock_pdf
         mock_pdf.__exit__ = MagicMock(return_value=False)
 
-        with patch("paper_manager.analyzer.pdfplumber.open", return_value=mock_pdf):
-            from paper_manager.analyzer import get_page_count
+        with patch("deepaper.analyzer.pdfplumber.open", return_value=mock_pdf):
+            from deepaper.analyzer import get_page_count
             count = get_page_count(pdf_path)
 
         assert count == 3
@@ -147,10 +147,10 @@ class TestAnalyzePaper:
         }
 
         with (
-            patch("paper_manager.analyzer.extract_text", return_value="paper text here"),
-            patch("paper_manager.analyzer._call_claude", return_value=json.dumps(expected_analysis)) as mock_call,
+            patch("deepaper.analyzer.extract_text", return_value="paper text here"),
+            patch("deepaper.analyzer._call_claude", return_value=json.dumps(expected_analysis)) as mock_call,
         ):
-            from paper_manager.analyzer import analyze_paper
+            from deepaper.analyzer import analyze_paper
             result = analyze_paper(pdf_path, "Analyze this paper.", _make_config())
 
         # Verify prompt included paper text
@@ -176,10 +176,10 @@ class TestAnalyzePaper:
         long_text = "x" * 100000  # exceeds 80000 char limit
 
         with (
-            patch("paper_manager.analyzer.extract_text", return_value=long_text),
-            patch("paper_manager.analyzer._call_claude", return_value=json.dumps(expected_analysis)) as mock_call,
+            patch("deepaper.analyzer.extract_text", return_value=long_text),
+            patch("deepaper.analyzer._call_claude", return_value=json.dumps(expected_analysis)) as mock_call,
         ):
-            from paper_manager.analyzer import analyze_paper
+            from deepaper.analyzer import analyze_paper
             result = analyze_paper(pdf_path, "Analyze this paper.", _make_config())
 
         # Verify text was truncated in the prompt
@@ -206,10 +206,10 @@ class TestAnalyzePaper:
         }
 
         with (
-            patch("paper_manager.analyzer.extract_text", return_value="some text"),
-            patch("paper_manager.analyzer._call_claude", return_value=json.dumps(expected)),
+            patch("deepaper.analyzer.extract_text", return_value="some text"),
+            patch("deepaper.analyzer._call_claude", return_value=json.dumps(expected)),
         ):
-            from paper_manager.analyzer import analyze_paper
+            from deepaper.analyzer import analyze_paper
             result = analyze_paper(pdf_path, "prompt", _make_config())
 
         assert isinstance(result, dict)
@@ -230,8 +230,8 @@ class TestClassifyPaper:
         cfg = _make_config()
         cfg.templates_path = tmp_path
 
-        with patch("paper_manager.analyzer._call_claude", return_value='{"category": "llm/pretraining"}') as mock_call:
-            from paper_manager.analyzer import classify_paper
+        with patch("deepaper.analyzer._call_claude", return_value='{"category": "llm/pretraining"}') as mock_call:
+            from deepaper.analyzer import classify_paper
             result = classify_paper(analysis, cfg)
 
         assert result == "llm/pretraining"
@@ -249,8 +249,8 @@ class TestClassifyPaper:
         cfg = _make_config()
         cfg.templates_path = tmp_path
 
-        with patch("paper_manager.analyzer._call_claude", side_effect=RuntimeError("error")):
-            from paper_manager.analyzer import classify_paper
+        with patch("deepaper.analyzer._call_claude", side_effect=RuntimeError("error")):
+            from deepaper.analyzer import classify_paper
             result = classify_paper(analysis, cfg)
 
         assert result == "misc"
@@ -265,7 +265,7 @@ class TestClassifyPaper:
         cfg = _make_config()
         cfg.templates_path = tmp_path  # no categories.md here
 
-        from paper_manager.analyzer import classify_paper
+        from deepaper.analyzer import classify_paper
         result = classify_paper(analysis, cfg)
 
         assert result == "misc"
@@ -281,8 +281,8 @@ class TestGenerateTags:
         }
         expected_tags = ["NLP", "transformer", "deep-learning"]
 
-        with patch("paper_manager.analyzer._call_claude", return_value=json.dumps({"tags": expected_tags})) as mock_call:
-            from paper_manager.analyzer import generate_tags
+        with patch("deepaper.analyzer._call_claude", return_value=json.dumps({"tags": expected_tags})) as mock_call:
+            from deepaper.analyzer import generate_tags
             tags = generate_tags(analysis, _make_config())
 
         assert isinstance(tags, list)

@@ -115,7 +115,7 @@ def sync_to_git(
     except git.InvalidGitRepositoryError:
         typer.echo(
             f"Not a git repository: {repo_dir}\n"
-            "Run: paper-manager init --git-remote <url>",
+            "Run: deepaper init --git-remote <url>",
             err=True,
         )
         raise

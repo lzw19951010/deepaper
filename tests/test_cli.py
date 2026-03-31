@@ -1,4 +1,4 @@
-"""Tests for paper_manager.cli commands."""
+"""Tests for deepaper.cli commands."""
 from __future__ import annotations
 
 import json
@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from typer.testing import CliRunner
 
-from paper_manager.cli import app
+from deepaper.cli import app
 
 runner = CliRunner()
 
@@ -150,19 +150,19 @@ class TestAdd:
         note_path = tmp_path / "papers" / "llm" / "pretraining" / "test-paper.md"
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
-            patch("paper_manager.downloader.parse_arxiv_id", return_value="2301.00001"),
-            patch("paper_manager.writer.find_existing", return_value=None),
-            patch("paper_manager.downloader.fetch_metadata", return_value=SAMPLE_METADATA),
-            patch("paper_manager.downloader.download_pdf", return_value=pdf_path),
-            patch("paper_manager.templates.load_template", return_value="Analyze this."),
-            patch("paper_manager.templates.render_prompt", return_value="prompt text"),
-            patch("paper_manager.analyzer.analyze_paper", return_value=SAMPLE_ANALYSIS),
-            patch("paper_manager.analyzer.generate_tags", return_value=["ml", "testing"]),
-            patch("paper_manager.analyzer.classify_paper", return_value="llm/pretraining"),
-            patch("paper_manager.writer.write_paper_note", return_value=note_path),
-            patch("paper_manager.search.get_collection", return_value=MagicMock()),
-            patch("paper_manager.search.index_paper"),
+            patch("deepaper.config.load_config", return_value=cfg),
+            patch("deepaper.downloader.parse_arxiv_id", return_value="2301.00001"),
+            patch("deepaper.writer.find_existing", return_value=None),
+            patch("deepaper.downloader.fetch_metadata", return_value=SAMPLE_METADATA),
+            patch("deepaper.downloader.download_pdf", return_value=pdf_path),
+            patch("deepaper.templates.load_template", return_value="Analyze this."),
+            patch("deepaper.templates.render_prompt", return_value="prompt text"),
+            patch("deepaper.analyzer.analyze_paper", return_value=SAMPLE_ANALYSIS),
+            patch("deepaper.analyzer.generate_tags", return_value=["ml", "testing"]),
+            patch("deepaper.analyzer.classify_paper", return_value="llm/pretraining"),
+            patch("deepaper.writer.write_paper_note", return_value=note_path),
+            patch("deepaper.search.get_collection", return_value=MagicMock()),
+            patch("deepaper.search.index_paper"),
         ):
             result = runner.invoke(app, ["add", "https://arxiv.org/abs/2301.00001"])
 
@@ -176,10 +176,10 @@ class TestAdd:
         existing_note = tmp_path / "papers" / "2023" / "test.md"
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
-            patch("paper_manager.downloader.parse_arxiv_id", return_value="2301.00001"),
-            patch("paper_manager.writer.find_existing", return_value=existing_note),
-            patch("paper_manager.downloader.fetch_metadata") as mock_fetch,
+            patch("deepaper.config.load_config", return_value=cfg),
+            patch("deepaper.downloader.parse_arxiv_id", return_value="2301.00001"),
+            patch("deepaper.writer.find_existing", return_value=existing_note),
+            patch("deepaper.downloader.fetch_metadata") as mock_fetch,
         ):
             result = runner.invoke(app, ["add", "2301.00001"])
 
@@ -192,8 +192,8 @@ class TestAdd:
         cfg = _make_config(tmp_path)
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
-            patch("paper_manager.downloader.parse_arxiv_id", side_effect=ValueError("bad url")),
+            patch("deepaper.config.load_config", return_value=cfg),
+            patch("deepaper.downloader.parse_arxiv_id", side_effect=ValueError("bad url")),
         ):
             result = runner.invoke(app, ["add", "not-a-url"])
 
@@ -212,19 +212,19 @@ class TestAdd:
         mock_write = MagicMock(return_value=tmp_path / "papers" / "test.md")
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
-            patch("paper_manager.downloader.parse_arxiv_id", return_value="2301.00001"),
-            patch("paper_manager.writer.find_existing", return_value=tmp_path / "papers" / "existing.md"),
-            patch("paper_manager.downloader.fetch_metadata", return_value=SAMPLE_METADATA),
-            patch("paper_manager.downloader.download_pdf", return_value=pdf_path),
-            patch("paper_manager.templates.load_template", return_value="Analyze."),
-            patch("paper_manager.templates.render_prompt", return_value="prompt"),
-            patch("paper_manager.analyzer.analyze_paper", return_value=SAMPLE_ANALYSIS),
-            patch("paper_manager.analyzer.generate_tags", return_value=["ml"]),
-            patch("paper_manager.analyzer.classify_paper", return_value="misc"),
-            patch("paper_manager.writer.write_paper_note", mock_write),
-            patch("paper_manager.search.get_collection", return_value=MagicMock()),
-            patch("paper_manager.search.index_paper"),
+            patch("deepaper.config.load_config", return_value=cfg),
+            patch("deepaper.downloader.parse_arxiv_id", return_value="2301.00001"),
+            patch("deepaper.writer.find_existing", return_value=tmp_path / "papers" / "existing.md"),
+            patch("deepaper.downloader.fetch_metadata", return_value=SAMPLE_METADATA),
+            patch("deepaper.downloader.download_pdf", return_value=pdf_path),
+            patch("deepaper.templates.load_template", return_value="Analyze."),
+            patch("deepaper.templates.render_prompt", return_value="prompt"),
+            patch("deepaper.analyzer.analyze_paper", return_value=SAMPLE_ANALYSIS),
+            patch("deepaper.analyzer.generate_tags", return_value=["ml"]),
+            patch("deepaper.analyzer.classify_paper", return_value="misc"),
+            patch("deepaper.writer.write_paper_note", mock_write),
+            patch("deepaper.search.get_collection", return_value=MagicMock()),
+            patch("deepaper.search.index_paper"),
         ):
             result = runner.invoke(app, ["add", "--force", "2301.00001"])
 
@@ -256,9 +256,9 @@ class TestSearch:
         ]
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
-            patch("paper_manager.search.get_collection", return_value=MagicMock()),
-            patch("paper_manager.search.search_papers", return_value=mock_results),
+            patch("deepaper.config.load_config", return_value=cfg),
+            patch("deepaper.search.get_collection", return_value=MagicMock()),
+            patch("deepaper.search.search_papers", return_value=mock_results),
         ):
             result = runner.invoke(app, ["search", "attention mechanism"])
 
@@ -272,7 +272,7 @@ class TestSearch:
         cfg = _make_config(tmp_path)
         # chromadb_path intentionally NOT created
 
-        with patch("paper_manager.config.load_config", return_value=cfg):
+        with patch("deepaper.config.load_config", return_value=cfg):
             result = runner.invoke(app, ["search", "transformers"])
 
         assert result.exit_code != 0
@@ -282,9 +282,9 @@ class TestSearch:
         cfg.chromadb_path.mkdir(parents=True)
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
-            patch("paper_manager.search.get_collection", return_value=MagicMock()),
-            patch("paper_manager.search.search_papers", return_value=[]),
+            patch("deepaper.config.load_config", return_value=cfg),
+            patch("deepaper.search.get_collection", return_value=MagicMock()),
+            patch("deepaper.search.search_papers", return_value=[]),
         ):
             result = runner.invoke(app, ["search", "nothing here"])
 
@@ -302,9 +302,9 @@ class TestReindex:
         cfg.papers_path.mkdir(parents=True)
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
-            patch("paper_manager.search.get_collection", return_value=MagicMock()),
-            patch("paper_manager.search.reindex_all", return_value=7),
+            patch("deepaper.config.load_config", return_value=cfg),
+            patch("deepaper.search.get_collection", return_value=MagicMock()),
+            patch("deepaper.search.reindex_all", return_value=7),
         ):
             result = runner.invoke(app, ["reindex"])
 
@@ -316,7 +316,7 @@ class TestReindex:
         cfg = _make_config(tmp_path)
         # papers_path intentionally NOT created
 
-        with patch("paper_manager.config.load_config", return_value=cfg):
+        with patch("deepaper.config.load_config", return_value=cfg):
             result = runner.invoke(app, ["reindex"])
 
         assert result.exit_code != 0
@@ -333,9 +333,9 @@ class TestTag:
         _write_paper_note(cfg.papers_path)
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
-            patch("paper_manager.analyzer.generate_tags", return_value=["new-tag", "ml"]),
-            patch("paper_manager.writer.update_frontmatter") as mock_update,
+            patch("deepaper.config.load_config", return_value=cfg),
+            patch("deepaper.analyzer.generate_tags", return_value=["new-tag", "ml"]),
+            patch("deepaper.writer.update_frontmatter") as mock_update,
         ):
             result = runner.invoke(app, ["tag"])
 
@@ -352,9 +352,9 @@ class TestTag:
             _write_paper_note(cfg.papers_path, arxiv_id=f"2301.0000{i}")
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
-            patch("paper_manager.analyzer.generate_tags", return_value=["ml"]),
-            patch("paper_manager.writer.update_frontmatter") as mock_update,
+            patch("deepaper.config.load_config", return_value=cfg),
+            patch("deepaper.analyzer.generate_tags", return_value=["ml"]),
+            patch("deepaper.writer.update_frontmatter") as mock_update,
         ):
             result = runner.invoke(app, ["tag", "--limit", "2"])
 
@@ -369,9 +369,9 @@ class TestTag:
         _write_paper_note(cfg.papers_path, arxiv_id="2301.00001", date="2023-01-01")
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
-            patch("paper_manager.analyzer.generate_tags", return_value=["ml"]),
-            patch("paper_manager.writer.update_frontmatter") as mock_update,
+            patch("deepaper.config.load_config", return_value=cfg),
+            patch("deepaper.analyzer.generate_tags", return_value=["ml"]),
+            patch("deepaper.writer.update_frontmatter") as mock_update,
         ):
             result = runner.invoke(app, ["tag", "--since", "2022-01-01"])
 
@@ -384,7 +384,7 @@ class TestTag:
         cfg = _make_config(tmp_path)
         cfg.papers_path.mkdir(parents=True)
 
-        with patch("paper_manager.config.load_config", return_value=cfg):
+        with patch("deepaper.config.load_config", return_value=cfg):
             result = runner.invoke(app, ["tag"])
 
         assert result.exit_code == 0
@@ -404,7 +404,7 @@ class TestConfigCmd:
         mock_proc.stdout = "OK"
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
+            patch("deepaper.config.load_config", return_value=cfg),
             patch("subprocess.run", return_value=mock_proc),
         ):
             result = runner.invoke(app, ["config"])
@@ -418,7 +418,7 @@ class TestConfigCmd:
         cfg = _make_config(tmp_path)
 
         with (
-            patch("paper_manager.config.load_config", return_value=cfg),
+            patch("deepaper.config.load_config", return_value=cfg),
             patch("subprocess.run", side_effect=Exception("connection error")),
         ):
             result = runner.invoke(app, ["config"])

@@ -1,4 +1,4 @@
-"""Tests for paper_manager.writer module."""
+"""Tests for deepaper.writer module."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from paper_manager.writer import (
+from deepaper.writer import (
     find_existing,
     sanitize_filename,
     update_frontmatter,
