@@ -1,4 +1,4 @@
-"""Configuration loading for paper-manager.
+"""Configuration loading for deepaper.
 
 Priority order: environment variables > config.yaml > defaults.
 """
@@ -20,6 +20,7 @@ class Config:
     papers_dir: str = "papers"
     template: str = "default"
     chromadb_dir: str = ".chromadb"
+    semantic_scholar_api_key: str = ""
 
     # Derived paths (set after init)
     root_dir: Path = field(default_factory=Path.cwd)
@@ -41,17 +42,39 @@ class Config:
         return self.root_dir / "tmp"
 
 
+def _ensure_config(config_path: Path) -> None:
+    """Create a default config.yaml if one does not exist."""
+    from deepaper.defaults import DEFAULT_CONFIG_YAML
+    config_path.write_text(DEFAULT_CONFIG_YAML, encoding="utf-8")
+
+
+def _ensure_templates(templates_dir: Path) -> None:
+    """Create the templates directory with default templates if missing."""
+    from deepaper.defaults import DEFAULT_TEMPLATE, DEFAULT_CATEGORIES
+
+    templates_dir.mkdir(parents=True, exist_ok=True)
+
+    default_md = templates_dir / "default.md"
+    if not default_md.exists():
+        default_md.write_text(DEFAULT_TEMPLATE, encoding="utf-8")
+
+    categories_md = templates_dir / "categories.md"
+    if not categories_md.exists():
+        categories_md.write_text(DEFAULT_CATEGORIES, encoding="utf-8")
+
+
 def load_config(root_dir: Path | None = None) -> Config:
     """Load configuration from environment variables and config.yaml.
+
+    If config.yaml does not exist it is created automatically with defaults
+    so that commands like ``deepaper add`` work from a fresh directory without
+    requiring the user to run ``deepaper init`` first.
 
     Args:
         root_dir: Project root directory. Defaults to current working directory.
 
     Returns:
         Config instance with all settings resolved.
-
-    Raises:
-        SystemExit: If required config (API key) is missing.
     """
     if root_dir is None:
         root_dir = Path.cwd()
@@ -59,12 +82,14 @@ def load_config(root_dir: Path | None = None) -> Config:
     config_path = root_dir / "config.yaml"
     file_config: dict = {}
 
-    if config_path.exists():
-        with open(config_path, encoding="utf-8") as f:
-            file_config = yaml.safe_load(f) or {}
-    elif (root_dir / "config.yaml.example").exists():
-        # config.yaml doesn't exist yet — user needs to run init
-        pass
+    if not config_path.exists():
+        _ensure_config(config_path)
+
+    with open(config_path, encoding="utf-8") as f:
+        file_config = yaml.safe_load(f) or {}
+
+    # Ensure templates directory exists
+    _ensure_templates(root_dir / "templates")
 
     # API key is optional — analysis now uses Claude Code CLI (Max subscription)
     api_key = (
@@ -72,22 +97,17 @@ def load_config(root_dir: Path | None = None) -> Config:
         or file_config.get("anthropic_api_key", "")
     )
 
-    # Warn if config.yaml is missing entirely
-    if not config_path.exists():
-        import typer
-        typer.echo(
-            "No config.yaml found. Run: paper-manager init",
-            err=True,
-        )
-        raise typer.Exit(1)
-
     return Config(
         api_key=api_key,
-        model=os.environ.get("PAPER_MANAGER_MODEL") or file_config.get("model", "claude-opus-4-6"),
+        model=os.environ.get("DEEPAPER_MODEL") or file_config.get("model", "claude-opus-4-6"),
         tag_model=file_config.get("tag_model", "claude-opus-4-6"),
         git_remote=file_config.get("git_remote", ""),
         papers_dir=file_config.get("papers_dir", "papers"),
         template=file_config.get("template", "default"),
         chromadb_dir=file_config.get("chromadb_dir", ".chromadb"),
+        semantic_scholar_api_key=(
+            os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
+            or file_config.get("semantic_scholar_api_key", "")
+        ),
         root_dir=root_dir,
     )

@@ -1,4 +1,4 @@
-"""Shared test fixtures for paper-manager tests."""
+"""Shared test fixtures for deepaper tests."""
 from __future__ import annotations
 
 import os
@@ -26,7 +26,7 @@ def tmp_project(tmp_path: Path) -> Path:
     (tmp_path / "papers").mkdir()
     (tmp_path / "templates").mkdir()
     (tmp_path / "tmp").mkdir()
-    (tmp_path / "src" / "paper_manager").mkdir(parents=True)
+    (tmp_path / "src" / "deepaper").mkdir(parents=True)
 
     # Write a minimal config.yaml
     (tmp_path / "config.yaml").write_text(
