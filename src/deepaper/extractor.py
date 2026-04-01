@@ -8,7 +8,6 @@ Auditor ensures page coverage is not missing large segments.
 from __future__ import annotations
 
 import re
-from collections import Counter
 
 # ---------------------------------------------------------------------------
 # Constants
