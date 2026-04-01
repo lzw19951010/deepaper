@@ -47,3 +47,6 @@ Thumbs.db
 
 # Claude Code: keep project settings, ignore local machine config
 .claude/settings.local.json
+
+# Deepaper pipeline run artifacts (local only)
+.deepaper/
