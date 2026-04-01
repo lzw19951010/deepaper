@@ -1,7 +1,5 @@
 """Tests for pipeline I/O safety layer."""
 import json
-from pathlib import Path
-import pytest
 
 
 def test_safe_write_json_creates_file(tmp_path):
