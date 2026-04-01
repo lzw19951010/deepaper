@@ -13,7 +13,7 @@ def safe_write_json(path: str, data: dict) -> bool:
     try:
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(".tmp")
+        tmp = p.with_name(p.name + ".tmp")
         tmp.write_text(
             json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
         )
@@ -22,7 +22,7 @@ def safe_write_json(path: str, data: dict) -> bool:
     except Exception as e:
         logger.warning("JSON write failed: %s: %s", path, e)
         try:
-            Path(path).with_suffix(".tmp").unlink(missing_ok=True)
+            Path(path).with_name(Path(path).name + ".tmp").unlink(missing_ok=True)
         except Exception:
             pass
         return False
@@ -35,7 +35,7 @@ def safe_read_json(path: str, default=None):
         if not text.strip():
             return default
         return json.loads(text)
-    except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
+    except Exception as e:
         logger.warning("JSON read failed: %s: %s", path, e)
         return default
 
