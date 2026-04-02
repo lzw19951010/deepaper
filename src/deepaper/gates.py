@@ -13,6 +13,8 @@ from typing import Any
 
 import yaml
 
+from deepaper.content_checklist import check_content_markers
+
 # ---------------------------------------------------------------------------
 # Character-floor thresholds per h4 section (Chinese heading → min chars)
 # ---------------------------------------------------------------------------
@@ -481,6 +483,9 @@ def run_hard_gates(
         )
     else:
         results["H8"] = dict(_SKIPPED)
+
+    # H9: Content Markers
+    results["H9"] = check_content_markers(merged_md)
 
     failed = [name for name, res in results.items() if not res.get("passed")]
     return {
