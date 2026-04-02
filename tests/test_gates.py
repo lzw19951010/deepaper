@@ -345,3 +345,20 @@ class TestRunHardGates:
         assert result["results"]["H4"]["passed"] is True
         assert result["results"]["H7"]["passed"] is True
         assert result["results"]["H8"]["passed"] is True
+
+
+# ===========================================================================
+# TestH9ContentMarkers
+# ===========================================================================
+
+class TestH9ContentMarkers:
+    def test_h9_included_in_run_hard_gates(self):
+        from deepaper.gates import run_hard_gates
+
+        md = (
+            "---\nbaselines:\n  - A\n  - B\ntldr: MATH 96.2% on benchmark\n---\n"
+            "#### 核心速览\n- **TL;DR:** MATH达96.2%\n- **一图流:** 类比\n"
+            "- **核心机制一句话:** [A]+[B]+[C]+[D]\n"
+        )
+        result = run_hard_gates(md, {}, [], None, None)
+        assert "H9" in result["results"]
