@@ -264,3 +264,29 @@ class TestGenerateWriterPrompt:
             table_def_pages=[7, 9],
         )
         assert "PDF" not in prompt or "paper.pdf" not in prompt
+
+
+class TestTemplateEnhancements:
+    """Verify DEFAULT_TEMPLATE contains new content and formatting guidance."""
+
+    def test_simple_example_guidance(self):
+        from deepaper.defaults import DEFAULT_TEMPLATE
+        assert "1000篇文档" in DEFAULT_TEMPLATE
+        assert "手指头跟着算" in DEFAULT_TEMPLATE
+
+    def test_metaphor_guidance(self):
+        from deepaper.defaults import DEFAULT_TEMPLATE
+        assert "鸡尾酒调配" in DEFAULT_TEMPLATE
+        assert "精准映射到技术机制" in DEFAULT_TEMPLATE
+
+    def test_section_separator_guidance(self):
+        from deepaper.defaults import DEFAULT_TEMPLATE
+        assert "水平线分隔" in DEFAULT_TEMPLATE
+
+    def test_bullet_format_guidance(self):
+        from deepaper.defaults import DEFAULT_TEMPLATE
+        assert "**粗体标题:**" in DEFAULT_TEMPLATE
+
+    def test_incremental_annotation_guidance(self):
+        from deepaper.defaults import DEFAULT_TEMPLATE
+        assert "95.9(+0.3)" in DEFAULT_TEMPLATE
