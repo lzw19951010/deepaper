@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+SLASH_CMD_VERSION = 2
+
 
 def get_default_slash_command() -> str:
     """Load the slash command template from the package's .claude/commands/ directory."""

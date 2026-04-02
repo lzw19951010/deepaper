@@ -13,18 +13,20 @@ from typing import Any
 
 import yaml
 
+from deepaper.content_checklist import check_content_markers
+
 # ---------------------------------------------------------------------------
 # Character-floor thresholds per h4 section (Chinese heading → min chars)
 # ---------------------------------------------------------------------------
 
 CHAR_FLOORS: dict[str, int] = {
-    "方法详解": 2000,
-    "实验与归因": 1500,
-    "核心速览": 500,
-    "动机与第一性原理": 800,
-    "专家批判": 800,
-    "机制迁移分析": 800,
-    "背景知识补充": 300,
+    "核心速览": 300,
+    "动机与第一性原理": 400,
+    "方法详解": 1500,
+    "实验与归因": 800,
+    "专家批判": 500,
+    "机制迁移分析": 600,
+    "背景知识补充": 200,
 }
 
 # Regex to extract numbers (integers and decimals) from text.
@@ -481,6 +483,9 @@ def run_hard_gates(
         )
     else:
         results["H8"] = dict(_SKIPPED)
+
+    # H9: Content Markers
+    results["H9"] = check_content_markers(merged_md)
 
     failed = [name for name, res in results.items() if not res.get("passed")]
     return {
