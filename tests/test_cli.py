@@ -187,16 +187,16 @@ class TestSlashCommandTemplate:
 
     def test_has_pipeline_structure(self):
         content = self._get_template()
-        assert "HardGates" in content or "hardgates" in content.lower()
-        assert "SoftGates" in content or "Critic" in content
-        assert "Writer-Visual" in content or "writer-visual" in content.lower()
-        assert "StructCheck" in content or "struct_check" in content
+        assert "deepaper extract" in content
+        assert "deepaper prompt" in content
+        assert "deepaper merge" in content
+        assert "deepaper gates" in content
+        assert "deepaper fix" in content
+        assert "deepaper classify" in content
 
     def test_has_run_dir_structure(self):
         content = self._get_template()
         assert ".deepaper/runs/" in content
-        assert "text_by_page.json" in content
-        assert "visual_registry.json" in content
 
     def test_has_download_save_commands(self):
         content = self._get_template()
