@@ -21,12 +21,19 @@ app = typer.Typer(
 
 
 def _auto_install_slash_command() -> None:
-    """Auto-install slash command to ~/.claude/commands/ if not present."""
+    """Auto-install slash command to ~/.claude/commands/ if not present or outdated."""
     cmd_path = Path.home() / ".claude" / "commands" / "deepaper.md"
-    if not cmd_path.exists():
-        cmd_path.parent.mkdir(parents=True, exist_ok=True)
-        from deepaper.defaults import get_default_slash_command
-        cmd_path.write_text(get_default_slash_command(), encoding="utf-8")
+    from deepaper.defaults import get_default_slash_command, SLASH_CMD_VERSION
+
+    version_marker = f"<!-- deepaper-version: {SLASH_CMD_VERSION} -->"
+
+    if cmd_path.exists():
+        existing = cmd_path.read_text(encoding="utf-8")
+        if version_marker in existing:
+            return  # already current version
+
+    cmd_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd_path.write_text(get_default_slash_command(), encoding="utf-8")
 
 
 # Auto-install on first import (i.e., first `deepaper` command)

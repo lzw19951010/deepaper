@@ -1,3 +1,4 @@
+<!-- deepaper-version: 2 -->
 Analyze an arxiv paper and save to the deepaper knowledge base using a multi-agent pipeline.
 
 ## Step 0: Setup

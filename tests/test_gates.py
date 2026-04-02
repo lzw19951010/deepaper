@@ -133,6 +133,17 @@ class TestH3CharFloors:
         assert result["passed"] is False
         assert len(result["failures"]) > 0
 
+    def test_updated_char_floors_values(self):
+        from deepaper.gates import CHAR_FLOORS
+        assert CHAR_FLOORS["核心速览"] == 300
+        assert CHAR_FLOORS["动机与第一性原理"] == 400
+        assert CHAR_FLOORS["方法详解"] == 1500
+        assert CHAR_FLOORS["实验与归因"] == 800
+        assert CHAR_FLOORS["专家批判"] == 500
+        assert CHAR_FLOORS["机制迁移分析"] == 600
+        assert CHAR_FLOORS["背景知识补充"] == 200
+        assert sum(CHAR_FLOORS.values()) < 5000
+
 
 # ===========================================================================
 # TestH5TldrNumbers

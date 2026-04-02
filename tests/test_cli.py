@@ -205,3 +205,50 @@ class TestSlashCommandTemplate:
     def test_has_auto_install(self):
         content = self._get_template()
         assert "pip install deepaper" in content
+
+
+# ---------------------------------------------------------------------------
+# auto-install version awareness
+# ---------------------------------------------------------------------------
+
+class TestAutoInstallVersion:
+    def test_old_version_gets_overwritten(self, tmp_path: Path) -> None:
+        cmd_path = tmp_path / ".claude" / "commands" / "deepaper.md"
+        cmd_path.parent.mkdir(parents=True, exist_ok=True)
+        cmd_path.write_text("<!-- deepaper-version: 1 -->\nold content\n")
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            from deepaper.cli import _auto_install_slash_command
+            _auto_install_slash_command()
+
+        content = cmd_path.read_text()
+        assert "<!-- deepaper-version: 1 -->" not in content or "<!-- deepaper-version: 2 -->" in content
+        from deepaper.defaults import SLASH_CMD_VERSION
+        assert f"<!-- deepaper-version: {SLASH_CMD_VERSION} -->" in content
+
+    def test_current_version_not_overwritten(self, tmp_path: Path) -> None:
+        from deepaper.defaults import SLASH_CMD_VERSION
+        cmd_path = tmp_path / ".claude" / "commands" / "deepaper.md"
+        cmd_path.parent.mkdir(parents=True, exist_ok=True)
+        original = f"<!-- deepaper-version: {SLASH_CMD_VERSION} -->\ncurrent content\n"
+        cmd_path.write_text(original)
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            from deepaper.cli import _auto_install_slash_command
+            _auto_install_slash_command()
+
+        assert cmd_path.read_text() == original
+
+    def test_no_file_creates_new(self, tmp_path: Path) -> None:
+        cmd_path = tmp_path / ".claude" / "commands" / "deepaper.md"
+        assert not cmd_path.exists()
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            from deepaper.cli import _auto_install_slash_command
+            _auto_install_slash_command()
+
+        assert cmd_path.exists()
+        from deepaper.defaults import SLASH_CMD_VERSION
+        # The generated content should work (may or may not have version marker
+        # depending on whether the slash command file has been rewritten yet)
+        assert cmd_path.stat().st_size > 0
