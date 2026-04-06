@@ -6,7 +6,7 @@ class TestStructCheck:
     def test_all_sections_present(self):
         from deepaper.extractor import struct_check
         notes = "\n".join(f"## {s}\n{'x' * 300}" for s in [
-            "META", "MAIN_RESULTS", "ABLATIONS", "HYPERPARAMETERS",
+            "META", "KEY_FINDINGS",
             "FORMULAS", "DATA_COMPOSITION", "EVAL_CONFIG",
             "TRAINING_COSTS", "DESIGN_DECISIONS", "RELATED_WORK", "BASELINES",
         ])
@@ -17,19 +17,19 @@ class TestStructCheck:
     def test_missing_section(self):
         from deepaper.extractor import struct_check
         notes = "\n".join(f"## {s}\n{'x' * 300}" for s in [
-            "META", "MAIN_RESULTS", "HYPERPARAMETERS",
-            "FORMULAS", "DATA_COMPOSITION", "EVAL_CONFIG",
+            "META", "KEY_FINDINGS",
+            "FORMULAS", "DATA_COMPOSITION",
             "DESIGN_DECISIONS", "RELATED_WORK", "BASELINES",
         ])
         result = struct_check(notes, total_pages=30, paper_profile={})
         assert result["passed"] is False
-        assert "ABLATIONS" in result["missing_sections"]
+        assert "EVAL_CONFIG" in result["missing_sections"]
         assert "TRAINING_COSTS" in result["missing_sections"]
 
     def test_thin_section(self):
         from deepaper.extractor import struct_check
         notes = "\n".join(f"## {s}\n{'x' * 300}" for s in [
-            "META", "MAIN_RESULTS", "ABLATIONS", "HYPERPARAMETERS",
+            "META", "KEY_FINDINGS",
             "FORMULAS", "DATA_COMPOSITION", "EVAL_CONFIG",
             "TRAINING_COSTS", "DESIGN_DECISIONS", "RELATED_WORK", "BASELINES",
         ])
@@ -63,3 +63,15 @@ class TestAuditCoverage:
         notes = " ".join(f"unique_term_page{i}" for i in range(1, 6))
         result = audit_coverage(text_by_page, notes, total_pages=20)
         assert len(result["uncovered_segments"]) > 0
+
+
+class TestUpdatedSections:
+    def test_key_findings_in_required(self):
+        from deepaper.extractor import REQUIRED_SECTIONS
+        assert "KEY_FINDINGS" in REQUIRED_SECTIONS
+
+    def test_old_table_sections_removed(self):
+        from deepaper.extractor import REQUIRED_SECTIONS
+        assert "MAIN_RESULTS" not in REQUIRED_SECTIONS
+        assert "ABLATIONS" not in REQUIRED_SECTIONS
+        assert "HYPERPARAMETERS" not in REQUIRED_SECTIONS

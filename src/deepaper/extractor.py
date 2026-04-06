@@ -15,9 +15,7 @@ import re
 
 REQUIRED_SECTIONS = [
     "META",
-    "MAIN_RESULTS",
-    "ABLATIONS",
-    "HYPERPARAMETERS",
+    "KEY_FINDINGS",
     "FORMULAS",
     "DATA_COMPOSITION",
     "EVAL_CONFIG",
@@ -31,9 +29,7 @@ REQUIRED_SECTIONS = [
 # does not provide enough information for dynamic thresholds).
 _ABSOLUTE_FLOOR: dict[str, int] = {
     "META": 50,
-    "MAIN_RESULTS": 100,
-    "ABLATIONS": 60,
-    "HYPERPARAMETERS": 60,
+    "KEY_FINDINGS": 150,
     "FORMULAS": 40,
     "DATA_COMPOSITION": 60,
     "EVAL_CONFIG": 60,
@@ -117,9 +113,8 @@ def _compute_thresholds(
             # Map some extractor sections to paper sections heuristically
             mapping = {
                 "META": "Abstract",
-                "MAIN_RESULTS": "Experiments",
+                "KEY_FINDINGS": "Experiments",
                 "RELATED_WORK": "Related Work",
-                "ABLATIONS": "Experiments",
                 "EVAL_CONFIG": "Experiments",
                 "DESIGN_DECISIONS": "Method",
                 "BASELINES": "Experiments",
@@ -131,7 +126,7 @@ def _compute_thresholds(
         # Boost certain sections when paper has many tables/equations
         if sec == "FORMULAS" and num_equations > 5:
             dynamic = max(dynamic, int(floor * 1.5))
-        if sec in ("MAIN_RESULTS", "ABLATIONS") and num_tables > 5:
+        if sec == "KEY_FINDINGS" and num_tables > 5:
             dynamic = max(dynamic, int(floor * 1.3))
 
         # Scale by page factor but never below absolute floor
@@ -148,7 +143,7 @@ def struct_check(
     total_pages: int,
     paper_profile: dict,
 ) -> dict:
-    """Check that all 11 required sections exist with sufficient content.
+    """Check that all 9 required sections exist with sufficient content.
 
     Parameters
     ----------
