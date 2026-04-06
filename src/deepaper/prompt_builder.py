@@ -120,13 +120,11 @@ def gates_to_constraints(
         floor = CHAR_FLOORS.get(sec, 300)
         lines.append(f"- 「{sec}」≥ {floor:,} 字符（H3）")
 
-    # H4: table count
+    # Table guidance (H4 removed — tables are selectively extracted)
     if "实验与归因" in sections:
-        n_tables = sum(1 for v in registry.values() if v.get("type") == "Table")
-        gate = min(n_tables, 6)
-        if gate > 0:
-            lines.append(f"- 输出 ≥ {gate} 张完整 markdown 对比表格（H4）")
-        lines.append("- 表格数字必须从 notes MAIN_RESULTS 段逐项复制，禁止编造（H8）")
+        lines.append("- 围绕核心表格展开归因分析，引用数据必须来自 notes KEY_FINDINGS 段或原文")
+        lines.append("- 实验表格只保留核心行（支撑主要结论的对比行），不要求完整复制")
+        lines.append("- 表格数字必须可追溯到原文，禁止编造（H8）")
 
     # H5: TL;DR numbers
     if "核心速览" in sections:

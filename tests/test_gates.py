@@ -592,3 +592,15 @@ class TestH10FigureRefDensity:
         result = run_hard_gates(md, {}, core_figures, {1: "page text"}, None)
         assert "H10" in result["results"]
         assert result["results"]["H10"]["passed"] is True
+
+
+class TestH4Removed:
+    """H4 (Table Count) should always be skipped."""
+
+    def test_h4_always_skipped(self):
+        from deepaper.gates import run_hard_gates
+        md = "---\nbaselines:\n  - A\n  - B\ntldr: test 96.2% on 3 data\n---\n#### Content\ntext\n"
+        registry = {"Table_1": {"type": "Table", "id": 1, "pages": [3], "definition_page": 3, "has_caption": True}}
+        result = run_hard_gates(md, {}, [], {3: "page text"}, registry)
+        assert result["results"]["H4"]["skipped"] is True
+        assert result["results"]["H4"]["passed"] is True

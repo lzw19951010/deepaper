@@ -152,8 +152,12 @@ class TestGatesToConstraints:
             registry=registry,
             core_figures=[],
         )
-        assert "6" in constraints  # min(7, 6)
-        assert "表格" in constraints
+        # H4 removed: no table count constraint
+        assert "（H4）" not in constraints
+        # But should have core table guidance
+        assert "核心表格" in constraints or "核心行" in constraints
+        # H8 still present
+        assert "H8" in constraints
 
 
 class TestGenerateWriterPrompt:

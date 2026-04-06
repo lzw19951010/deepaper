@@ -488,11 +488,8 @@ def run_hard_gates(
     # H3: Character Floors
     results["H3"] = check_char_floors(merged_md)
 
-    # H4: Table Count — requires registry
-    if registry is not None:
-        results["H4"] = check_table_count(merged_md, registry)
-    else:
-        results["H4"] = dict(_SKIPPED)
+    # H4: Table Count — permanently skipped (tables are now selectively extracted)
+    results["H4"] = dict(_SKIPPED)
 
     # H5: TL;DR Numbers
     results["H5"] = check_tldr_numbers(merged_md)
