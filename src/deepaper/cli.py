@@ -392,6 +392,7 @@ def extract(
     from deepaper.registry import (
         build_visual_registry, compute_paper_profile,
         identify_core_figures, extract_figure_contexts,
+        identify_core_tables,
     )
 
     root = Path.cwd()
@@ -427,6 +428,9 @@ def extract(
     fig_contexts = extract_figure_contexts(int_text, core_figs)
     safe_write_json(str(run_dir / "figure_contexts.json"), fig_contexts)
 
+    core_tables = identify_core_tables(registry_data, int_text, profile["total_pages"])
+    safe_write_json(str(run_dir / "core_tables.json"), core_tables)
+
     table_def_pages = sorted(set(
         v["definition_page"] for v in registry_data.values()
         if v.get("type") == "Table" and v.get("definition_page")
@@ -439,6 +443,7 @@ def extract(
         "num_figures": profile["num_figures"],
         "num_equations": profile["num_equations"],
         "core_figures": [cf["key"] for cf in core_figs],
+        "core_tables": [ct["key"] for ct in core_tables],
         "table_def_pages": table_def_pages,
     }, ensure_ascii=False, indent=2))
 
