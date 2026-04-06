@@ -518,12 +518,27 @@ def prompt(
         core_tables = safe_read_json(str(run_dir / "core_tables.json"), [])
         core_figures = safe_read_json(str(run_dir / "core_figures.json"), [])
 
-        # Compute read strategy based on text.txt line count
+        # Compute read strategy: generate exact Read commands
         text_path = run_dir / "text.txt"
         total_lines = 0
         if text_path.exists():
             total_lines = sum(1 for _ in text_path.open(encoding="utf-8"))
-        recommended_reads = max(1, -(-total_lines // 2000))  # ceil division
+
+        chunk_size = 2000
+        read_commands_lines: list[str] = []
+        if total_lines <= chunk_size:
+            read_commands_lines.append(
+                f'1. `Read(file_path="{run_dir}/text.txt")`'
+            )
+        else:
+            n_reads = max(1, -(-total_lines // chunk_size))
+            for i in range(n_reads):
+                offset = i * chunk_size
+                limit = min(chunk_size, total_lines - offset)
+                read_commands_lines.append(
+                    f'{i + 1}. `Read(file_path="{run_dir}/text.txt", offset={offset}, limit={limit})`'
+                )
+        read_commands = "\n".join(read_commands_lines)
 
         core_tables_json = json.dumps(core_tables, ensure_ascii=False, indent=2) if core_tables else "（本论文未检测到核心表格候选）"
         core_figures_json = json.dumps(core_figures, ensure_ascii=False, indent=2) if core_figures else "（本论文未检测到灵魂图）"
@@ -533,7 +548,7 @@ def prompt(
             .replace("{TOTAL_PAGES}", str(profile.get("total_pages", "?")))
             .replace("{ARXIV_ID}", arxiv_id)
             .replace("{TOTAL_LINES}", str(total_lines))
-            .replace("{RECOMMENDED_READS}", str(recommended_reads))
+            .replace("{READ_COMMANDS}", read_commands)
             .replace("{CORE_FIGURES_JSON}", core_figures_json)
             .replace("{CORE_TABLES_JSON}", core_tables_json))
         out_path = run_dir / "prompt_extractor.md"

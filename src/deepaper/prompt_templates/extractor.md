@@ -5,13 +5,13 @@
 - 页数: {TOTAL_PAGES}
 - ID: {ARXIV_ID}
 
-## 读取策略
+## 读取策略（严格执行，禁止修改）
 
-text.txt 共 {TOTAL_LINES} 行。按以下方式读取：
-- 如果 ≤ 2000 行：一次性 `Read(file_path="{RUN_DIR}/text.txt")` 读完
-- 如果 > 2000 行：分 {RECOMMENDED_READS} 次读取，每次 ~2000 行，用 offset+limit 参数
+text.txt 共 {TOTAL_LINES} 行。请严格按以下调用序列读取，不得拆分、合并或跳过：
 
-禁止每次只读几百行。读完所有内容后再开始写笔记。
+{READ_COMMANDS}
+
+读完所有内容后再开始写笔记。禁止在读取过程中穿插写入或其他操作。
 
 ## 核心视觉元素（程序预筛选）
 

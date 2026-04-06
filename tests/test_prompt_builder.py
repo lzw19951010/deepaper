@@ -348,8 +348,12 @@ class TestReadStrategy:
             file_info={"notes_lines": 500, "text_lines": 3500},
         )
         assert "读取策略" in prompt
-        assert "500" in prompt
-        assert "3500" in prompt or "3,500" in prompt
+        # Should have exact Read commands with offset/limit for text.txt (3500 lines = 2 reads)
+        assert "offset=0" in prompt
+        assert "offset=2000" in prompt
+        assert "limit=2000" in prompt
+        # notes.md (500 lines) should be one read, no offset
+        assert "notes.md" in prompt
 
     def test_no_read_strategy_when_no_file_info(self):
         from deepaper.prompt_builder import (

@@ -269,24 +269,28 @@ def generate_writer_prompt(
         parts.append(f"- PDF 表格验证页: {pdf_path}（仅读这些页: {table_def_pages}）")
     parts.append("")
 
-    # 6b. Read strategy
+    # 6b. Read strategy — generate exact Read commands
     if file_info:
-        parts.append("## 读取策略")
-        notes_lines = file_info.get("notes_lines", 0)
-        text_lines = file_info.get("text_lines", 0)
-        if notes_lines > 0:
-            notes_reads = max(1, -(-notes_lines // 2000))
-            if notes_reads == 1:
-                parts.append(f"- notes.md ({notes_lines} 行): 一次性读完")
+        parts.append("## 读取策略（严格执行，禁止修改）")
+        parts.append("")
+        chunk = 2000
+        for label, fpath_suffix, total in [
+            ("notes.md", "notes.md", file_info.get("notes_lines", 0)),
+            ("text.txt", "text.txt", file_info.get("text_lines", 0)),
+        ]:
+            if total <= 0:
+                continue
+            fpath = f"{run_dir}/{fpath_suffix}"
+            if total <= chunk:
+                parts.append(f'- `Read(file_path="{fpath}")`')
             else:
-                parts.append(f"- notes.md ({notes_lines} 行): 分 {notes_reads} 次，每次 ~2000 行")
-        if text_lines > 0:
-            text_reads = max(1, -(-text_lines // 2000))
-            if text_reads == 1:
-                parts.append(f"- text.txt ({text_lines} 行): 一次性读完")
-            else:
-                parts.append(f"- text.txt ({text_lines} 行): 分 {text_reads} 次，每次 ~2000 行")
-        parts.append("- 禁止每次只读几百行，严格按上述分片执行")
+                n = max(1, -(-total // chunk))
+                for i in range(n):
+                    offset = i * chunk
+                    limit = min(chunk, total - offset)
+                    parts.append(f'- `Read(file_path="{fpath}", offset={offset}, limit={limit})`')
+        parts.append("")
+        parts.append("按以上顺序逐条执行，禁止拆分、合并或跳过。读完所有内容后再开始写作。")
         parts.append("")
 
     # 7. Output
