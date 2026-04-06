@@ -65,8 +65,16 @@ If gates passed=false:
 ```bash
 deepaper fix ARXID
 ```
-Read the prompt_file from fix output. Spawn a Fixer Agent (subagent_type: executor, name: fixer) with that prompt content. Fixer writes merged_fixed.md, then copy it as final.md.
-Re-run `deepaper gates ARXID` on the fixed version (max 2 rounds total).
+Read the prompt_file from fix output. Spawn a Fixer Agent (subagent_type: executor, name: fixer) with that prompt content.
+The fixer should read merged.md and notes.md using the Read tool. If files are > 2000 lines, read in chunks of ~2000 lines using offset+limit. If ≤ 2000 lines, read in one call.
+Fixer writes merged_fixed.md.
+
+After fixer completes, check for no-op:
+```bash
+diff .deepaper/runs/ARXID/merged.md .deepaper/runs/ARXID/merged_fixed.md
+```
+- If files are identical (no diff output): fixer produced no changes. Skip Gates R2, copy merged.md as final.md.
+- If files differ: copy merged_fixed.md as final.md, then re-run `deepaper gates ARXID` (max 2 rounds total).
 
 If gates passed=true: final.md is already set by merge.
 
