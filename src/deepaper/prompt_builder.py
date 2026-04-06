@@ -217,6 +217,7 @@ def generate_writer_prompt(
     constraints: str,
     pdf_path: str,
     table_def_pages: list[int],
+    file_info: dict | None = None,
 ) -> str:
     """Generate a complete prompt for one Writer agent."""
     parts = []
@@ -267,6 +268,26 @@ def generate_writer_prompt(
     if task.needs_pdf_pages and table_def_pages:
         parts.append(f"- PDF 表格验证页: {pdf_path}（仅读这些页: {table_def_pages}）")
     parts.append("")
+
+    # 6b. Read strategy
+    if file_info:
+        parts.append("## 读取策略")
+        notes_lines = file_info.get("notes_lines", 0)
+        text_lines = file_info.get("text_lines", 0)
+        if notes_lines > 0:
+            notes_reads = max(1, -(-notes_lines // 2000))
+            if notes_reads == 1:
+                parts.append(f"- notes.md ({notes_lines} 行): 一次性读完")
+            else:
+                parts.append(f"- notes.md ({notes_lines} 行): 分 {notes_reads} 次，每次 ~2000 行")
+        if text_lines > 0:
+            text_reads = max(1, -(-text_lines // 2000))
+            if text_reads == 1:
+                parts.append(f"- text.txt ({text_lines} 行): 一次性读完")
+            else:
+                parts.append(f"- text.txt ({text_lines} 行): 分 {text_reads} 次，每次 ~2000 行")
+        parts.append("- 禁止每次只读几百行，严格按上述分片执行")
+        parts.append("")
 
     # 7. Output
     output_file = f"{run_dir}/part_{task.name.replace('writer-', '')}.md"

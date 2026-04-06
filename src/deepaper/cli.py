@@ -549,6 +549,13 @@ def prompt(
             if v.get("type") == "Table" and v.get("definition_page")
         ))
 
+        # Compute file sizes for read strategy
+        text_path = run_dir / "text.txt"
+        notes_path = run_dir / "notes.md"
+        text_lines = sum(1 for _ in text_path.open(encoding="utf-8")) if text_path.exists() else 0
+        notes_lines = sum(1 for _ in notes_path.open(encoding="utf-8")) if notes_path.exists() else 0
+        file_info = {"notes_lines": notes_lines, "text_lines": text_lines}
+
         template_sections = parse_template_sections(DEFAULT_TEMPLATE)
         system_role = extract_system_role(DEFAULT_TEMPLATE)
         tasks = auto_split(profile or {})
@@ -571,6 +578,7 @@ def prompt(
                 constraints=constraints,
                 pdf_path=str(pdf_path),
                 table_def_pages=table_def_pages,
+                file_info=file_info,
             )
             prompt_file = run_dir / f"prompt_{task.name}.md"
             prompt_file.write_text(prompt_text, encoding="utf-8")

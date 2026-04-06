@@ -325,6 +325,53 @@ class TestWriterTypeConstraints:
         assert "95.9(+0.3)" in constraints or "增量" in constraints
 
 
+class TestReadStrategy:
+    """Writer prompts should include read strategy based on file sizes."""
+
+    def test_prompt_contains_read_strategy(self):
+        from deepaper.prompt_builder import (
+            generate_writer_prompt, WriterTask, parse_template_sections,
+            extract_system_role,
+        )
+        from deepaper.defaults import DEFAULT_TEMPLATE
+
+        task = WriterTask(name="writer-text-0", sections=["核心速览"])
+        prompt = generate_writer_prompt(
+            task=task,
+            run_dir="/tmp/test",
+            template_sections=parse_template_sections(DEFAULT_TEMPLATE),
+            system_role=extract_system_role(DEFAULT_TEMPLATE),
+            figure_contexts={},
+            constraints="",
+            pdf_path="",
+            table_def_pages=[],
+            file_info={"notes_lines": 500, "text_lines": 3500},
+        )
+        assert "读取策略" in prompt
+        assert "500" in prompt
+        assert "3500" in prompt or "3,500" in prompt
+
+    def test_no_read_strategy_when_no_file_info(self):
+        from deepaper.prompt_builder import (
+            generate_writer_prompt, WriterTask, parse_template_sections,
+            extract_system_role,
+        )
+        from deepaper.defaults import DEFAULT_TEMPLATE
+
+        task = WriterTask(name="writer-text-0", sections=["核心速览"])
+        prompt = generate_writer_prompt(
+            task=task,
+            run_dir="/tmp/test",
+            template_sections=parse_template_sections(DEFAULT_TEMPLATE),
+            system_role=extract_system_role(DEFAULT_TEMPLATE),
+            figure_contexts={},
+            constraints="",
+            pdf_path="",
+            table_def_pages=[],
+        )
+        assert "读取策略" not in prompt
+
+
 class TestTemplateEnhancements:
     """Verify DEFAULT_TEMPLATE contains new content and formatting guidance."""
 
