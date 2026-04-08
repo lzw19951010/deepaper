@@ -70,32 +70,37 @@ class TestAutoSplit:
             "num_equations": equations,
         }
 
-    def test_short_paper_two_writers(self):
+    def test_short_paper_three_writers(self):
         from deepaper.prompt_builder import auto_split
         tasks = auto_split(self._profile(pages=8, tables=3, figures=2, equations=1))
-        assert len(tasks) == 2
-        assert tasks[0].name == "writer-visual"
-        assert set(tasks[0].sections) == {"方法详解", "实验与归因"}
+        assert len(tasks) == 3  # method + experiment + 1 text
+        assert tasks[0].name == "writer-method"
+        assert tasks[0].sections == ["方法详解"]
+        assert tasks[1].name == "writer-experiment"
+        assert tasks[1].sections == ["实验与归因"]
         text_sections = set()
-        for t in tasks[1:]:
+        for t in tasks[2:]:
             text_sections.update(t.sections)
         assert "核心速览" in text_sections
         assert "机制迁移分析" in text_sections
 
-    def test_long_paper_three_writers(self):
+    def test_long_paper_four_writers(self):
         from deepaper.prompt_builder import auto_split
         tasks = auto_split(self._profile(pages=120, tables=20, figures=22, equations=10))
-        assert len(tasks) == 3
-        assert tasks[0].name == "writer-visual"
+        assert len(tasks) == 4  # method + experiment + 2 text
+        assert tasks[0].name == "writer-method"
+        assert tasks[1].name == "writer-experiment"
 
-    def test_visual_sections_always_together(self):
+    def test_visual_sections_split_for_parallelism(self):
         from deepaper.prompt_builder import auto_split
         for pages in [8, 30, 120]:
             tasks = auto_split(self._profile(pages=pages))
-            visual = tasks[0]
-            assert visual.name == "writer-visual"
-            assert "方法详解" in visual.sections
-            assert "实验与归因" in visual.sections
+            method = tasks[0]
+            experiment = tasks[1]
+            assert method.name == "writer-method"
+            assert method.sections == ["方法详解"]
+            assert experiment.name == "writer-experiment"
+            assert experiment.sections == ["实验与归因"]
 
     def test_all_sections_covered(self):
         from deepaper.prompt_builder import auto_split, SECTION_ORDER

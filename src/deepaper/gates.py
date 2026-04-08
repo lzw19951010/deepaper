@@ -14,20 +14,16 @@ from typing import Any
 import yaml
 
 from deepaper.content_checklist import check_content_markers
-
-# ---------------------------------------------------------------------------
-# Character-floor thresholds per h4 section (Chinese heading → min chars)
-# ---------------------------------------------------------------------------
-
-CHAR_FLOORS: dict[str, int] = {
-    "核心速览": 300,
-    "动机与第一性原理": 400,
-    "方法详解": 1500,
-    "实验与归因": 800,
-    "专家批判": 500,
-    "机制迁移分析": 600,
-    "背景知识补充": 200,
-}
+from deepaper.output_schema import (
+    CHAR_FLOORS,
+    CODE_BLOCKS_EXEMPT_FROM_HEADING_CHECK,
+    FRONTMATTER_FIELDS,
+    H2_MIN_COVERAGE,
+    H8_SKIP_WHEN_NO_DEFINITION_PAGES,
+    H8_TOLERANCE,
+    H8_UNTRACED_THRESHOLD,
+    HEADING_FORBIDDEN,
+)
 
 # Regex to extract numbers (integers and decimals) from text.
 # Uses a lookahead for the trailing boundary so "3x" still captures "3".
@@ -146,7 +142,7 @@ def check_structural_coverage(merged: str, checklist: dict) -> dict:
 
     coverage = matched / len(checklist)
     return {
-        "passed": coverage >= 0.6,
+        "passed": coverage >= H2_MIN_COVERAGE,
         "coverage": round(coverage, 4),
         "missing": missing,
     }
@@ -223,36 +219,67 @@ def check_table_count(md: str, registry: dict) -> dict:
 # ===========================================================================
 
 def check_tldr_numbers(md: str) -> dict:
-    """Check TL;DR in YAML frontmatter contains >= 2 numbers.
+    """Check TL;DR contains >= 2 numbers.
 
-    Returns ``{passed, count}``.
+    Checks YAML frontmatter ``tldr`` field first. If not found, falls back
+    to the body ``##### TL;DR`` section text. This dual-source approach
+    matches the output_schema contract where tldr is a required frontmatter
+    field, while gracefully handling writers that put it in the body.
+
+    Returns ``{passed, count, source}``.
     """
+    min_numbers = FRONTMATTER_FIELDS["tldr"].min_numbers
+
+    # Primary: check frontmatter
     fm = _extract_frontmatter(md)
     tldr = fm.get("tldr", "")
-    if not isinstance(tldr, str):
-        tldr = str(tldr)
+    if isinstance(tldr, str) and tldr.strip():
+        numbers = _NUMBER_RE.findall(tldr)
+        return {"passed": len(numbers) >= min_numbers, "count": len(numbers), "source": "frontmatter"}
 
-    numbers = _NUMBER_RE.findall(tldr)
-    count = len(numbers)
-    return {"passed": count >= 2, "count": count}
+    # Fallback: check body ##### TL;DR section
+    body = _extract_body(md)
+    tldr_match = re.search(
+        r"#{4,5}\s*TL;DR.*?\n(.*?)(?=\n#{4,5}\s|\Z)",
+        body,
+        re.DOTALL,
+    )
+    if tldr_match:
+        tldr_text = tldr_match.group(1).strip()
+        numbers = _NUMBER_RE.findall(tldr_text)
+        return {"passed": len(numbers) >= min_numbers, "count": len(numbers), "source": "body"}
+
+    return {"passed": False, "count": 0, "source": "not_found"}
 
 
 # ===========================================================================
 # H6: Heading Levels
 # ===========================================================================
 
+def _strip_code_blocks(text: str) -> str:
+    """Remove fenced code blocks (```...```) from text."""
+    return re.sub(r"```[^\n]*\n.*?```", "", text, flags=re.DOTALL)
+
+
 def check_heading_levels(md: str) -> dict:
     """Check body only uses h4/h5/h6. Reject h1/h2/h3/h7+.
+
+    Code blocks are exempt — ``# comment`` inside ```python blocks
+    is not a heading.
 
     Returns ``{passed, violations}`` where violations is a list of strings.
     """
     body = _extract_body(md)
+
+    if CODE_BLOCKS_EXEMPT_FROM_HEADING_CHECK:
+        body = _strip_code_blocks(body)
+
     violations: list[str] = []
 
     for m in _HEADING_RE.finditer(body):
         hashes = m.group(1)
         level = len(hashes)
-        if level not in (4, 5, 6):
+        if level in HEADING_FORBIDDEN:
             # Get the heading text for context
             line_end = body.find("\n", m.start())
             if line_end == -1:
@@ -400,8 +427,8 @@ def check_number_fingerprint(
     md: str,
     text_by_page: dict[int, str],
     registry: dict,
-    threshold: float = 0.3,
-    tolerance: float = 0.15,
+    threshold: float = H8_UNTRACED_THRESHOLD,
+    tolerance: float = H8_TOLERANCE,
 ) -> dict:
     """Cross-validate numbers between source PDF tables and writer markdown.
 
@@ -412,6 +439,18 @@ def check_number_fingerprint(
     Returns ``{passed, untraced_ratio, suspect_tables, ...}``.
     """
     source_numbers = _extract_table_definition_numbers(text_by_page, registry)
+
+    # Skip when no table definition pages were found — cross-validation
+    # is impossible without a source-of-truth number set.
+    if H8_SKIP_WHEN_NO_DEFINITION_PAGES and not source_numbers:
+        return {
+            "passed": True,
+            "skipped": True,
+            "reason": "no table definition pages found in registry",
+            "untraced_ratio": 0.0,
+            "suspect_tables": [],
+        }
+
     md_tables = _extract_md_table_numbers(md)
 
     if not md_tables:

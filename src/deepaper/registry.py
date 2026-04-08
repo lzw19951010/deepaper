@@ -38,9 +38,9 @@ _SECTION_RE = re.compile(
 )
 
 # Subsection heading: numbered like "3.1 Something" or "3.1. Something"
-_SUBSECTION_RE = re.compile(
-    r"^(\d+\.\d+\.?\s+\S.*)$", re.MULTILINE
-)
+from deepaper.output_schema import H2_SUBSECTION_REGEX
+
+_SUBSECTION_RE = re.compile(H2_SUBSECTION_REGEX, re.MULTILINE)
 
 # Numbered equations: (1), (2), etc. on a line
 _EQUATION_RE = re.compile(r"\((\d+)\)")

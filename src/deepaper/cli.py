@@ -375,7 +375,9 @@ def gates(
     from deepaper.gates import run_hard_gates
     result = run_hard_gates(merged_md, checklist, core_figures, text_by_page, registry_data)
 
-    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+    result_json = json.dumps(result, ensure_ascii=False, indent=2)
+    (run_dir / "gates.json").write_text(result_json, encoding="utf-8")
+    typer.echo(result_json)
 
 
 # ---------------------------------------------------------------------------
@@ -609,14 +611,8 @@ def prompt(
                 "output_file": output_file,
             })
 
-        text_writers = [w for w in writers_config["writers"] if not w["name"].endswith("visual")]
-        visual_writers = [w for w in writers_config["writers"] if w["name"].endswith("visual")]
-        if len(text_writers) >= 2:
-            writers_config["merge_order"] = [text_writers[0]["name"], visual_writers[0]["name"], text_writers[1]["name"]]
-        elif text_writers:
-            writers_config["merge_order"] = [text_writers[0]["name"], visual_writers[0]["name"]]
-        else:
-            writers_config["merge_order"] = [visual_writers[0]["name"]]
+        # merge reorders sections by SECTION_ORDER, so just include all writers
+        writers_config["merge_order"] = [w["name"] for w in writers_config["writers"]]
 
         safe_write_json(str(run_dir / "writers.json"), writers_config)
         typer.echo(json.dumps(writers_config, ensure_ascii=False, indent=2))
@@ -645,16 +641,51 @@ def merge(
         typer.echo(json.dumps({"error": "writers.json not found"}))
         raise typer.Exit(1)
 
-    parts = []
+    # Read all writer parts
+    raw_parts = []
     for writer_name in config["merge_order"]:
         writer = next((w for w in config["writers"] if w["name"] == writer_name), None)
         if not writer:
             continue
         part_path = run_dir / writer["output_file"]
         if part_path.exists():
-            parts.append(part_path.read_text(encoding="utf-8"))
+            raw_parts.append(part_path.read_text(encoding="utf-8"))
 
-    merged = "\n\n".join(parts)
+    merged = "\n\n".join(raw_parts)
+
+    # Reorder sections by SECTION_ORDER
+    from deepaper.output_schema import SECTION_ORDER, HEADING_SECTION_LEVEL
+    h_prefix = "#" * HEADING_SECTION_LEVEL + " "  # "#### "
+    # Split into frontmatter + sections
+    frontmatter = ""
+    body = merged
+    if merged.startswith("---"):
+        fm_end = merged.find("---", 3)
+        if fm_end > 0:
+            frontmatter = merged[:fm_end + 3]
+            body = merged[fm_end + 3:]
+    # Parse sections by #### headers
+    section_pattern = re.compile(r"(?=^" + re.escape(h_prefix) + r")", re.MULTILINE)
+    chunks = section_pattern.split(body)
+    preamble = chunks[0] if chunks else ""
+    sections: dict[str, str] = {}
+    unmatched: list[str] = []
+    for chunk in chunks[1:]:
+        matched = False
+        for name in SECTION_ORDER:
+            if chunk.lstrip().startswith(h_prefix) and name in chunk[:chunk.find("\n") if "\n" in chunk else len(chunk)]:
+                sections[name] = h_prefix + chunk
+                matched = True
+                break
+        if not matched:
+            unmatched.append(h_prefix + chunk)
+    # Reassemble in canonical order
+    ordered = [frontmatter, preamble] if frontmatter else [preamble]
+    for name in SECTION_ORDER:
+        if name in sections:
+            ordered.append(sections[name])
+    ordered.extend(unmatched)
+    merged = "\n\n".join(part for part in ordered if part.strip())
 
     # Normalize: remove stray --- outside YAML frontmatter
     if merged.startswith("---"):

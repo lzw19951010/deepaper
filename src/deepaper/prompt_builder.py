@@ -6,21 +6,25 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from deepaper.gates import CHAR_FLOORS
+from deepaper.output_schema import (
+    CHAR_FLOORS,
+    FRONTMATTER_FIELDS,
+    HEADING_SECTION_LEVEL,
+    HEADING_SUBSECTION_LEVEL,
+    SECTION_ORDER as _SCHEMA_SECTION_ORDER,
+)
 
 # Canonical section names and their order (matches DEFAULT_TEMPLATE)
-SECTION_ORDER = [
-    "核心速览",
-    "动机与第一性原理",
-    "方法详解",
-    "实验与归因",
-    "专家批判",
-    "机制迁移分析",
-    "背景知识补充",
-]
+SECTION_ORDER = _SCHEMA_SECTION_ORDER
 
 # Sections that require PDF table pages and visual verification
 VISUAL_SECTIONS = ["方法详解", "实验与归因"]
+
+# Slug mapping for visual writer names
+_VISUAL_SLUGS: dict[str, str] = {
+    "方法详解": "method",
+    "实验与归因": "experiment",
+}
 
 # Section heading pattern in DEFAULT_TEMPLATE: **## 中文名 (English Name)**
 _TEMPLATE_SECTION_RE = re.compile(
@@ -126,12 +130,15 @@ def gates_to_constraints(
         lines.append("- 实验表格只保留核心行（支撑主要结论的对比行），不要求完整复制")
         lines.append("- 表格数字必须可追溯到原文，禁止编造（H8）")
 
-    # H5: TL;DR numbers
+    # H5: TL;DR numbers (from schema: frontmatter.tldr.min_numbers)
     if "核心速览" in sections:
-        lines.append("- TL;DR 必须包含 ≥2 个具体量化数字，如 \"MATH 96.2%\"（H5）")
+        min_nums = FRONTMATTER_FIELDS["tldr"].min_numbers
+        lines.append(f"- TL;DR（YAML frontmatter 的 tldr 字段）必须包含 ≥{min_nums} 个具体量化数字，如 \"MATH 96.2%\"（H5）")
 
-    # H6: heading levels
-    lines.append("- 主标题 ####（h4），子标题 #####（h5），禁止 h1/h2/h3（H6）")
+    # H6: heading levels (from schema: body.heading_levels)
+    lines.append(f"- 主标题 {'#' * HEADING_SECTION_LEVEL}（h{HEADING_SECTION_LEVEL}），"
+                 f"子标题 {'#' * HEADING_SUBSECTION_LEVEL}（h{HEADING_SUBSECTION_LEVEL}），"
+                 f"禁止 h1/h2/h3（H6）。代码块内 # 注释不受限制")
 
     # H7: core figure references
     if core_figures:
@@ -339,11 +346,14 @@ def auto_split(profile: dict) -> list[WriterTask]:
         b.sort(key=lambda s: SECTION_ORDER.index(s))
 
     tasks: list[WriterTask] = []
-    tasks.append(WriterTask(
-        name="writer-visual",
-        sections=list(VISUAL_SECTIONS),
-        needs_pdf_pages=True,
-    ))
+    # Each visual section gets its own writer for parallel execution
+    for sec in VISUAL_SECTIONS:
+        slug = _VISUAL_SLUGS.get(sec, sec)
+        tasks.append(WriterTask(
+            name=f"writer-{slug}",
+            sections=[sec],
+            needs_pdf_pages=True,
+        ))
     for i, bin_sections in enumerate(bins):
         tasks.append(WriterTask(
             name=f"writer-text-{i}",
