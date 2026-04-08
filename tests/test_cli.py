@@ -138,24 +138,31 @@ class TestSave:
             os.chdir(old_cwd)
 
     def test_save_from_file(self, tmp_path: Path) -> None:
-        md = "---\nvenue: NeurIPS 2023\nkeywords:\n  - test\n---\n\n## 核心速览\n\nContent."
+        md = (
+            "---\n"
+            "tldr: \"Test 96.2% AIME\"\n"
+            "tags:\n  - test-tag\n"
+            "baselines:\n  - A\n  - B\n"
+            "---\n\n#### 核心速览\n\nContent."
+        )
         result = self._invoke_save(tmp_path, md, ["--category", "llm/pretraining"])
         assert result.exit_code == 0
         notes = list((tmp_path / "papers" / "llm" / "pretraining").glob("*.md"))
         assert len(notes) == 1
         content = notes[0].read_text(encoding="utf-8")
-        assert "NeurIPS 2023" in content
+        assert "Test 96.2% AIME" in content
         assert "2301.00001" in content
 
-    def test_save_keywords_as_default_tags(self, tmp_path: Path) -> None:
-        result = self._invoke_save(tmp_path, "---\nkeywords:\n  - scaling\n  - LLM\n---\n\n## Body")
+    def test_save_tags_from_frontmatter(self, tmp_path: Path) -> None:
+        md = "---\ntags:\n  - scaling\n  - LLM\n---\n\n#### Body"
+        result = self._invoke_save(tmp_path, md)
         assert result.exit_code == 0
         notes = list((tmp_path / "papers" / "misc").glob("*.md"))
         fm = yaml.safe_load(notes[0].read_text()[3:notes[0].read_text().find("---", 3)])
         assert fm["tags"] == ["scaling", "LLM"]
 
-    def test_save_explicit_tags(self, tmp_path: Path) -> None:
-        result = self._invoke_save(tmp_path, "---\nkeywords:\n  - old\n---\n\n## Body",
+    def test_save_explicit_tags_override(self, tmp_path: Path) -> None:
+        result = self._invoke_save(tmp_path, "---\ntags:\n  - old\n---\n\n#### Body",
                                    ["--tags", "new-1,new-2"])
         assert result.exit_code == 0
         notes = list((tmp_path / "papers" / "misc").glob("*.md"))

@@ -201,7 +201,10 @@ def save(
     real_id = parse_arxiv_id(arxiv_id)
     metadata = fetch_metadata(real_id)
 
-    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else analysis_fm.get("keywords", [])
+    # CLI --tags overrides analysis frontmatter tags; otherwise use writer's
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else analysis_fm.get("tags", [])
+    if tags:
+        analysis_fm["tags"] = tag_list  # ensure writer.py preserves override
 
     note_path = write_paper_note(
         analysis_fm, analysis_body, metadata, tag_list,

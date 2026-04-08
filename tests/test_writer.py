@@ -32,16 +32,18 @@ def _sample_metadata() -> dict:
 
 def _sample_analysis_fm() -> dict:
     return {
-        "venue": "ICSE 2023",
-        "publication_type": "conference",
-        "doi": "10.1234/test.2023",
-        "keywords": ["testing", "software quality", "automation"],
         "tldr": "A structure-guided test generation framework that improves coverage by 30%.",
-        "core_contribution": "new-method",
         "baselines": ["EvoSuite", "Randoop"],
-        "datasets": ["Defects4J", "SF110"],
-        "metrics": ["branch coverage", "mutation score"],
-        "code_url": "https://github.com/example/test-framework",
+        "tags": ["testing", "software-quality", "automation"],
+        "mechanisms": [
+            {"name": "structure-guided-generation", "scope": "test gen", "ancestor": "random"},
+        ],
+        "key_tradeoffs": [
+            {"decision": "structure analysis first", "chosen_over": "random gen", "reason": "+30% coverage"},
+        ],
+        "key_numbers": [
+            {"metric": "coverage", "value": 78.5, "baseline": "EvoSuite", "baseline_value": 60.4},
+        ],
     }
 
 
@@ -187,18 +189,30 @@ def test_write_paper_note_creates_file(tmp_path: Path) -> None:
     fm_end = content.find("---", 3)
     assert fm_end != -1
     fm = yaml.safe_load(content[3:fm_end])
+    # v2 identity fields
     assert fm["arxiv_id"] == "2301.00001"
     assert fm["title"] == metadata["title"]
-    assert fm["tags"] == tags
-    assert fm["venue"] == "ICSE 2023"
     assert fm["category"] == "llm/pretraining"
-    assert fm["publication_type"] == "conference"
-    assert fm["doi"] == "10.1234/test.2023"
+    # v2 index layer (writer-supplied takes precedence over CLI tags)
     assert fm["tldr"] is not None
     assert fm["baselines"] == ["EvoSuite", "Randoop"]
-    assert fm["datasets"] == ["Defects4J", "SF110"]
-    assert fm["abstract"] == metadata["abstract"]
-    assert fm["arxiv_categories"] == metadata["categories"]
+    # tags from analysis_fm should win when present
+    assert fm["tags"] == ["testing", "software-quality", "automation"]
+    assert len(fm["mechanisms"]) == 1
+    assert fm["mechanisms"][0]["name"] == "structure-guided-generation"
+    assert len(fm["key_tradeoffs"]) == 1
+    assert len(fm["key_numbers"]) == 1
+    # Deprecated v1 fields must NOT be present
+    assert "venue" not in fm
+    assert "publication_type" not in fm
+    assert "doi" not in fm
+    assert "datasets" not in fm
+    assert "metrics" not in fm
+    assert "core_contribution" not in fm
+    assert "abstract" not in fm
+    assert "arxiv_categories" not in fm
+    assert "authors" not in fm
+    assert "keywords" not in fm
 
     # Check category-based subdirectory (llm/pretraining)
     assert path.parent.name == "pretraining"

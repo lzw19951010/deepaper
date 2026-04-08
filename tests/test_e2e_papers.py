@@ -274,18 +274,20 @@ class TestWriteRealPapers:
         fm_end = content.find("---", 3)
         written_fm = yaml.safe_load(content[3:fm_end])
 
-        # Arxiv metadata present
+        # v2 identity fields present
         assert written_fm["arxiv_id"] == metadata["arxiv_id"]
         assert written_fm["title"] == metadata["title"]
-        assert written_fm["authors"] == metadata["authors"]
-
-        # Claude analysis metadata merged
-        assert written_fm["venue"] == fm.get("venue")
-        assert written_fm["keywords"] == fm.get("keywords", [])
         assert written_fm["category"] == expected_category
+
+        # v2: tags from CLI take precedence over (absent) writer tags
         assert written_fm["tags"] == tags
 
-        # Body preserved
+        # v1 fields are dropped (authors/venue/keywords/datasets/metrics)
+        assert "authors" not in written_fm
+        assert "venue" not in written_fm
+        assert "keywords" not in written_fm
+
+        # Body preserved (these v1 fixtures use ## headings which v2 still passes through)
         written_body = content[fm_end + 3:].strip()
         assert "## 核心速览" in written_body
         assert "## 方法详解" in written_body
