@@ -522,3 +522,57 @@ class TestClassify:
             assert Path(output["prompt_file"]).exists()
         finally:
             os.chdir(old_cwd)
+
+
+class TestMergeFrontmatterHoisting:
+    """Merge must hoist YAML frontmatter to file top regardless of part order."""
+
+    def test_hoists_frontmatter_from_middle(self):
+        from deepaper.cli import _hoist_frontmatter
+
+        # Simulated merged output where frontmatter landed mid-file
+        content = (
+            "#### 第一性原理分析\n"
+            "痛点: something\n"
+            "\n"
+            "---\n"
+            "title: Test\n"
+            "baselines:\n"
+            "  - A\n"
+            "  - B\n"
+            "---\n"
+            "\n"
+            "#### 核心速览\n"
+            "TL;DR: 96.2% MATH\n"
+        )
+        result = _hoist_frontmatter(content)
+        assert result.startswith("---\n")
+        # Frontmatter should be at top
+        lines = result.split("\n")
+        assert lines[0] == "---"
+        # Second --- should close frontmatter
+        second_dash = next(i for i, l in enumerate(lines[1:], start=1) if l == "---")
+        assert "title: Test" in "\n".join(lines[1:second_dash])
+        # Body sections should follow
+        remainder = "\n".join(lines[second_dash + 1:])
+        assert "#### 核心速览" in remainder
+        assert "#### 第一性原理分析" in remainder
+
+    def test_leaves_content_alone_when_frontmatter_already_at_top(self):
+        from deepaper.cli import _hoist_frontmatter
+        content = (
+            "---\n"
+            "title: Already at top\n"
+            "---\n"
+            "\n"
+            "#### 核心速览\nbody\n"
+        )
+        result = _hoist_frontmatter(content)
+        assert result.startswith("---\ntitle: Already at top")
+
+    def test_collapses_double_heading_markers(self):
+        from deepaper.cli import _hoist_frontmatter
+        content = "#### #### 核心速览\nbody\n"
+        result = _hoist_frontmatter(content)
+        assert "#### ####" not in result
+        assert "#### 核心速览" in result

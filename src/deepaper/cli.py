@@ -626,6 +626,37 @@ def prompt(
 # merge
 # ---------------------------------------------------------------------------
 
+def _hoist_frontmatter(content: str) -> str:
+    """Move YAML frontmatter to the top and collapse double #### markers.
+
+    When writers write parts independently, the part containing frontmatter
+    may not be first in merge order, so frontmatter ends up mid-file. This
+    helper detects the `---\\n...---\\n` block anywhere in the content and
+    moves it to the start. Also collapses accidental `#### #### ` duplicates
+    that arise when a writer prepends `####` to a section name that already
+    has it.
+    """
+    import re as _re
+
+    content = content.strip()
+
+    # Collapse double heading markers: "#### #### X" -> "#### X"
+    content = _re.sub(r"#### #### ", "#### ", content)
+
+    if content.startswith("---\n"):
+        return content  # Already at top
+
+    # Find the first standalone "---\n...\n---\n" YAML block
+    match = _re.search(r"(^|\n)---\n(.*?)\n---\n", content, _re.DOTALL)
+    if not match:
+        return content  # No frontmatter to hoist
+
+    fm_block = "---\n" + match.group(2).strip() + "\n---\n\n"
+    body = content[:match.start()] + content[match.end():]
+    body = body.lstrip("\n")
+    return fm_block + body
+
+
 @app.command()
 def merge(
     arxiv_id: str = typer.Argument(..., help="arxiv ID to merge."),
@@ -698,6 +729,9 @@ def merge(
 
     # Remove stray title lines
     merged = re.sub(r"^#{1,3}\s+.*(?:Part [ABC]|深度分析|部分).*\n+", "", merged, flags=re.MULTILINE)
+
+    # Hoist frontmatter to top and collapse double #### markers
+    merged = _hoist_frontmatter(merged)
 
     merged_path = run_dir / "merged.md"
     merged_path.write_text(merged, encoding="utf-8")
