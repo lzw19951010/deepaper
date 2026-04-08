@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from deepaper.output_schema import (
-    CHAR_FLOORS,
     FRONTMATTER_FIELDS,
     HEADING_SECTION_LEVEL,
     HEADING_SUBSECTION_LEVEL,
@@ -96,107 +95,73 @@ def parse_template_sections(template: str) -> dict[str, str]:
     return sections
 
 
-def compute_scaling_factor(section: str, profile: dict) -> float:
-    """Estimate workload scaling based on paper characteristics."""
-    pages = profile.get("total_pages", 10)
-    tables = profile.get("num_tables", 0)
-    equations = profile.get("num_equations", 0)
-
-    page_scale = min(3.0, max(1.0, pages / 15))
-
-    if section == "方法详解":
-        return page_scale * max(1.0, 1.0 + equations * 0.1)
-    elif section == "实验与归因":
-        return page_scale * max(1.0, 1.0 + tables * 0.08)
-    else:
-        return page_scale
-
-
 def gates_to_constraints(
     sections: list[str],
     profile: dict,
     registry: dict,
     core_figures: list[dict],
 ) -> str:
-    """Translate gate requirements into Writer prompt constraints."""
+    """Translate gate requirements into Writer prompt constraints.
+
+    v2: replaces char-count targets with form-based preferences. We tell the
+    writer WHAT STRUCTURE to use (tables, flowcharts, numbered causal chains),
+    not HOW MANY CHARS to produce. Paper length grows the tables, not the
+    prose.
+    """
+    _ = profile  # unused in v2
+    _ = registry  # unused in v2
     lines = ["## ⚠️ 质量合同（写完后会被 programmatic 验证，不达标需返工）\n"]
+
     lines.append("**硬约束（gate 验证）：**")
-
-    # H3: char floors
-    for sec in sections:
-        floor = CHAR_FLOORS.get(sec, 300)
-        lines.append(f"- 「{sec}」≥ {floor:,} 字符（H3）")
-
-    # Table guidance (H4 removed — tables are selectively extracted)
-    if "实验与归因" in sections:
-        lines.append("- 围绕核心表格展开归因分析，引用数据必须来自 notes KEY_FINDINGS 段或原文")
-        lines.append("- 实验表格只保留核心行（支撑主要结论的对比行），不要求完整复制")
-        lines.append("- 表格数字必须可追溯到原文，禁止编造（H8）")
-
-    # H5: TL;DR numbers (from schema: frontmatter.tldr.min_numbers)
-    if "核心速览" in sections:
-        min_nums = FRONTMATTER_FIELDS["tldr"].min_numbers
-        lines.append(f"- TL;DR（YAML frontmatter 的 tldr 字段）必须包含 ≥{min_nums} 个具体量化数字，如 \"MATH 96.2%\"（H5）")
-
-    # H6: heading levels (from schema: body.heading_levels)
     lines.append(f"- 主标题 {'#' * HEADING_SECTION_LEVEL}（h{HEADING_SECTION_LEVEL}），"
                  f"子标题 {'#' * HEADING_SUBSECTION_LEVEL}（h{HEADING_SUBSECTION_LEVEL}），"
                  f"禁止 h1/h2/h3（H6）。代码块内 # 注释不受限制")
 
-    # H7: core figure references
+    # Figure references (H7)
     if core_figures:
         fig_ids = [f"Figure {cf['id']}" for cf in core_figures]
         lines.append(f"- 必须引用灵魂图: {', '.join(fig_ids)}（H7）")
 
-    # H1: baselines
+    # Frontmatter requirements (only for overview writer owning 核心速览)
     if "核心速览" in sections:
         lines.append("- YAML frontmatter baselines ≥ 2 个模型（H1）")
+        lines.append("- frontmatter.tldr 字段必须包含 ≥2 个具体量化数字（H5）")
+        lines.append("- frontmatter 必须包含 tags / mechanisms / key_tradeoffs / key_numbers 四个结构化字段")
 
-    # H9: content markers
-    markers = _section_content_markers(sections)
-    for m in markers:
-        lines.append(f"- {m}（H9）")
+    # Per-section structural content markers (H9)
+    content_rules = _section_content_markers(sections)
+    for rule in content_rules:
+        lines.append(f"- {rule}")
 
-    # --- Writer-type-specific guidance (non-gate, contract only) ---
-    lines.append("\n**写作指引（非 gate，但强烈建议遵循）：**")
+    # --- Form preferences (the core v2 change) ---
+    lines.append("\n**表达形式偏好（核心原则）：**")
+    lines.append("- 默认使用结构化形式（表格/流程图/列表），散文仅用于补充推理语境")
+    lines.append("- **禁止生成伪代码**（任何 ```python``` / ```pseudo``` 代码块都不允许）")
+    lines.append("- **数字对比必须用表格**，禁止散文内嵌 \"A 的 X 是 5.2，B 是 4.8\" 这种对比")
+    lines.append("- 对比 / 排序 / 成本 / 符号 必须用表格（硬性要求）")
+    lines.append("- 因果链 / 设计决策的理由 可用 1-3 句短散文补充，不鼓励展开为段落")
+    lines.append("- 比喻 ≤ 1 句，嵌入因果链内，不独立成段")
 
-    # Visual writer: flowchart + figure density
-    if "方法详解" in sections:
-        lines.append(
-            "- 「方法详解 → 精确版」必须包含 ≥1 个完整数据流图，"
-            "格式：Input → Step A → Step B → ... → Output，≥3 个箭头步骤（H9）"
-        )
-    if core_figures and ("方法详解" in sections or "实验与归因" in sections):
-        fig_ids = [f"Figure {cf['id']}" for cf in core_figures]
-        lines.append(
-            f"- 每个灵魂图（{', '.join(fig_ids)}）在正文中至少出现 2 次，"
-            "分布在不同段落（H10）"
-        )
+    # Standardized table column names (so outputs can be stitched across papers)
+    if any(s in sections for s in ["核心速览", "技术精要", "机制迁移"]):
+        lines.append("\n**标准化表格列名（跨论文可拼接，禁止改动）：**")
+    if "核心速览" in sections:
+        lines.append("- 关键数字表: `指标 | 数值 | 基线 | 基线值 | 增益`")
+    if "技术精要" in sections:
+        lines.append("- 符号表: `符号 | 含义 | 关键值`")
+        lines.append("- 设计决策表: `决策 | 备选方案 | 选择理由 | 证据来源`")
+        lines.append("- 消融排序表: `排名 | 组件 | 增益 | 数据来源`")
+        lines.append("- 隐性成本表: `成本项 | 量化数据 | 对决策的影响`")
+    if "机制迁移" in sections:
+        lines.append("- 机制解耦表: `原语名称 | 本文用途 | 抽象描述 | 信息论/几何直觉`")
 
-    # Text writer: metaphor + simple example
-    if "动机与第一性原理" in sections:
-        lines.append(
-            "- 「动机 → 物理/直觉解释」须包含一个生活化比喻，精准映射到技术机制"
-        )
-    if "方法详解" in sections:
-        lines.append(
-            "- 「方法详解 → 直觉版」须包含一个带具体数字的简化示例（≤200字），"
-            "让读者能手动跟算一遍"
-        )
-
-    # Formatting: incremental annotations in experiment tables
-    if "实验与归因" in sections:
-        lines.append(
-            "- 归因/ablation 表格数值后标注增量变化，格式：`95.9(+0.3)`"
-        )
-
-    # Suggested targets
-    lines.append("\n**建议目标：**")
-    for sec in sections:
-        floor = CHAR_FLOORS.get(sec, 300)
-        suggested = int(floor * compute_scaling_factor(sec, profile))
-        if suggested > floor * 1.5:
-            lines.append(f"- 「{sec}」建议 ~{suggested:,} 字符")
+    # Causal chain format
+    if "第一性原理分析" in sections:
+        lines.append("\n**因果链格式（硬性要求）：**")
+        lines.append("- 使用编号 `[C1]`, `[C2]`, `[C3]` 前缀（≤3 条）")
+        lines.append("- 每条格式：`[C1] Because {前提} → Therefore {结论}`")
+        lines.append("- 可附 ≤1 句比喻或语境补充，写在 `— ` 后")
+        lines.append("- 编号支持未来跨论文引用，不要省略 `[Cx]` 前缀")
 
     return "\n".join(lines)
 
@@ -204,17 +169,21 @@ def gates_to_constraints(
 def _section_content_markers(sections: list[str]) -> list[str]:
     """Return H9 content marker constraints relevant to given sections."""
     markers = []
-    if "方法详解" in sections:
-        markers.append("数值推演【必做】必须存在")
-        markers.append("伪代码（Python/PyTorch 代码块）必须存在")
-        markers.append("易混淆点 ≥2 个 ❌/✅ 对")
-    if "动机与第一性原理" in sections:
-        markers.append("因果链 Because→Therefore 格式必须存在")
-    if "专家批判" in sections:
-        markers.append("隐性成本必须包含 ≥3 个具体数字")
-    if "机制迁移分析" in sections:
-        markers.append("机制解耦表格（4列: 原语名称|本文用途|抽象描述|信息论直觉）必须存在")
-        markers.append("前身 (Ancestors) ≥ 3 个")
+    if "核心速览" in sections:
+        markers.append("TL;DR 含 ≥2 个量化数字（H9）")
+        markers.append("核心机制一句话 `[动作]+[对象]+[方式]+[效果]` 格式（H9）")
+        markers.append("关键数字表（标准化列名）必须存在（H9）")
+    if "第一性原理分析" in sections:
+        markers.append("因果链 `[C1]` 编号 + Because→Therefore 格式必须存在（H9）")
+    if "技术精要" in sections:
+        markers.append("方法流程图（≥3 个 → 箭头）必须存在（H9）")
+        markers.append("设计决策表（决策|备选方案|选择理由|证据来源）必须存在（H9）")
+        markers.append("消融排序表（排名|组件|增益|数据来源）必须存在（H9）")
+        markers.append("易混淆点 ≥2 个 ❌/✅ 对（H9）")
+        markers.append("隐性成本表（成本项|量化数据|对决策的影响）必须存在（H9）")
+    if "机制迁移" in sections:
+        markers.append("机制解耦表（4列: 原语名称|本文用途|抽象描述|信息论直觉）必须存在（H9）")
+        markers.append("前身 (Ancestors) ≥ 3 个（H9）")
     return markers
 
 

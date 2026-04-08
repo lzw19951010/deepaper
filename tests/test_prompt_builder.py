@@ -114,22 +114,21 @@ class TestAutoSplit:
 
 
 class TestGatesToConstraints:
-    def test_char_floor_in_constraints(self):
+    def test_heading_levels_in_constraints(self):
         from deepaper.prompt_builder import gates_to_constraints
         constraints = gates_to_constraints(
-            sections=["方法详解", "实验与归因"],
+            sections=["技术精要"],
             profile={"total_pages": 10, "num_tables": 5, "num_equations": 3},
             registry={"Table_1": {"type": "Table"}, "Table_2": {"type": "Table"}},
             core_figures=[{"id": 1, "key": "Figure_1"}],
         )
-        assert "方法详解" in constraints
         assert "Figure 1" in constraints  # H7
         assert "h1/h2/h3" in constraints  # H6
 
     def test_tldr_constraint_for_executive_summary(self):
         from deepaper.prompt_builder import gates_to_constraints
         constraints = gates_to_constraints(
-            sections=["核心速览", "动机与第一性原理"],
+            sections=["核心速览"],
             profile={"total_pages": 10},
             registry={},
             core_figures=[],
@@ -137,33 +136,32 @@ class TestGatesToConstraints:
         assert "TL;DR" in constraints
         assert "≥2" in constraints or ">=2" in constraints
 
-    def test_content_markers_for_methodology(self):
+    def test_content_markers_for_technical(self):
         from deepaper.prompt_builder import gates_to_constraints
         constraints = gates_to_constraints(
-            sections=["方法详解"],
+            sections=["技术精要"],
             profile={"total_pages": 10},
             registry={},
             core_figures=[],
         )
-        assert "数值推演" in constraints
-        assert "伪代码" in constraints
+        assert "设计決策" in constraints or "设计决策" in constraints
         assert "易混淆点" in constraints
+        assert "隐性成本" in constraints
 
-    def test_table_count_for_experiments(self):
+    def test_no_char_targets_in_constraints(self):
         from deepaper.prompt_builder import gates_to_constraints
         registry = {f"Table_{i}": {"type": "Table"} for i in range(1, 8)}
         constraints = gates_to_constraints(
-            sections=["方法详解", "实验与归因"],
+            sections=["技术精要"],
             profile={"total_pages": 30, "num_tables": 7},
             registry=registry,
             core_figures=[],
         )
         # H4 removed: no table count constraint
         assert "（H4）" not in constraints
-        # But should have core table guidance
-        assert "核心表格" in constraints or "核心行" in constraints
-        # H8 still present
-        assert "H8" in constraints
+        # v2: no char targets
+        assert "建议目标" not in constraints
+        assert "字符" not in constraints
 
 
 class TestGenerateWriterPrompt:
@@ -276,58 +274,61 @@ class TestGenerateWriterPrompt:
 
 
 class TestWriterTypeConstraints:
-    """gates_to_constraints should inject different clauses for visual vs text writers."""
+    """gates_to_constraints should inject different clauses for different v2 sections."""
 
-    def test_visual_writer_gets_flowchart_constraint(self):
+    def test_technical_writer_gets_flowchart_constraint(self):
         from deepaper.prompt_builder import gates_to_constraints
         constraints = gates_to_constraints(
-            sections=["方法详解", "实验与归因"],
+            sections=["技术精要"],
             profile={"total_pages": 10, "num_tables": 5, "num_equations": 3},
             registry={"Table_1": {"type": "Table"}, "Table_2": {"type": "Table"}},
             core_figures=[{"id": 1, "key": "Figure_1"}],
         )
-        assert "数据流图" in constraints
+        assert "方法流程图" in constraints
         assert "≥3" in constraints or "3 个" in constraints
 
-    def test_visual_writer_gets_figure_density_constraint(self):
+    def test_figure_references_in_constraints(self):
         from deepaper.prompt_builder import gates_to_constraints
         constraints = gates_to_constraints(
-            sections=["方法详解", "实验与归因"],
+            sections=["技术精要"],
             profile={"total_pages": 10},
             registry={},
             core_figures=[{"id": 1, "key": "Figure_1"}, {"id": 3, "key": "Figure_3"}],
         )
-        assert "至少出现 2 次" in constraints
+        assert "Figure 1" in constraints
+        assert "Figure 3" in constraints
 
-    def test_text_writer_gets_metaphor_constraint(self):
+    def test_overview_writer_gets_metaphor_constraint(self):
         from deepaper.prompt_builder import gates_to_constraints
         constraints = gates_to_constraints(
-            sections=["核心速览", "动机与第一性原理"],
+            sections=["核心速览"],
             profile={"total_pages": 10},
             registry={},
             core_figures=[],
         )
         assert "比喻" in constraints
 
-    def test_text_writer_gets_simple_example_constraint(self):
+    def test_principle_writer_gets_causal_chain_constraint(self):
         from deepaper.prompt_builder import gates_to_constraints
         constraints = gates_to_constraints(
-            sections=["核心速览", "动机与第一性原理", "方法详解"],
+            sections=["第一性原理分析"],
             profile={"total_pages": 10},
             registry={},
             core_figures=[],
         )
-        assert "简化示例" in constraints
+        assert "[C1]" in constraints
+        assert "Because" in constraints
 
-    def test_incremental_annotation_for_experiments(self):
+    def test_form_preferences_always_present(self):
         from deepaper.prompt_builder import gates_to_constraints
         constraints = gates_to_constraints(
-            sections=["方法详解", "实验与归因"],
+            sections=["技术精要"],
             profile={"total_pages": 10, "num_tables": 3},
             registry={"Table_1": {"type": "Table"}},
             core_figures=[],
         )
-        assert "95.9(+0.3)" in constraints or "增量" in constraints
+        assert "表格" in constraints
+        assert "散文" in constraints
 
 
 class TestReadStrategy:
@@ -415,3 +416,57 @@ class TestTemplateEnhancements:
         assert "第一性原理分析" in DEFAULT_TEMPLATE
         assert "技术精要" in DEFAULT_TEMPLATE
         assert "机制迁移" in DEFAULT_TEMPLATE
+
+
+class TestGatesToConstraintsV2:
+    def _profile(self):
+        return {"total_pages": 30, "num_tables": 10, "num_figures": 5, "num_equations": 3}
+
+    def test_no_char_target_section(self):
+        from deepaper.prompt_builder import gates_to_constraints
+        text = gates_to_constraints(
+            sections=["技术精要"],
+            profile=self._profile(),
+            registry={},
+            core_figures=[],
+        )
+        # No "建议目标" section (removed in v2)
+        assert "建议目标" not in text
+
+    def test_form_preferences_present(self):
+        from deepaper.prompt_builder import gates_to_constraints
+        text = gates_to_constraints(
+            sections=["技术精要"],
+            profile=self._profile(),
+            registry={},
+            core_figures=[],
+        )
+        assert "表格" in text
+        assert "禁止" in text and "伪代码" in text
+        assert "散文" in text
+
+    def test_principle_section_constraints(self):
+        from deepaper.prompt_builder import gates_to_constraints
+        text = gates_to_constraints(
+            sections=["第一性原理分析"],
+            profile=self._profile(),
+            registry={},
+            core_figures=[],
+        )
+        assert "[C1]" in text
+        assert "Because" in text and "Therefore" in text
+
+    def test_overview_section_constraints(self):
+        from deepaper.prompt_builder import gates_to_constraints
+        text = gates_to_constraints(
+            sections=["核心速览", "机制迁移"],
+            profile=self._profile(),
+            registry={},
+            core_figures=[],
+        )
+        assert "指标 | 数值" in text  # standardized key_numbers table
+        assert "原语名称" in text  # mechanism decomposition table
+
+    def test_compute_scaling_factor_deleted(self):
+        from deepaper import prompt_builder
+        assert not hasattr(prompt_builder, "compute_scaling_factor")
