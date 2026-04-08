@@ -15,7 +15,6 @@ import yaml
 
 from deepaper.content_checklist import check_content_markers
 from deepaper.output_schema import (
-    CHAR_FLOORS,
     CODE_BLOCKS_EXEMPT_FROM_HEADING_CHECK,
     FRONTMATTER_FIELDS,
     H2_MIN_COVERAGE,
@@ -149,30 +148,28 @@ def check_structural_coverage(merged: str, checklist: dict) -> dict:
 
 
 # ===========================================================================
-# H3: Character Floors
+# H3: Section Existence (v2)
 # ===========================================================================
 
-def check_char_floors(md: str) -> dict:
-    """Check each h4 section meets its minimum character floor.
+def check_sections_exist(md: str) -> dict:
+    """H3 v2: verify all 4 required section headings exist.
 
-    Returns ``{passed, failures}`` where failures is a list of dicts
-    describing which sections fell short.
+    Replaces char-floor based H3 from v1. In v2 we enforce structural
+    presence, not character count. Paper length grows via tables, so a
+    section can legitimately be short.
     """
+    from deepaper.output_schema import SECTION_ORDER
     body = _extract_body(md)
-    sections = _extract_sections_h4(body)
-
-    failures: list[dict] = []
-    for heading, floor in CHAR_FLOORS.items():
-        if heading in sections:
-            actual = len(sections[heading])
-            if actual < floor:
-                failures.append({
-                    "section": heading,
-                    "floor": floor,
-                    "actual": actual,
-                })
-
-    return {"passed": len(failures) == 0, "failures": failures}
+    missing: list[str] = []
+    for sec_name in SECTION_ORDER:
+        # Match #### <name> at heading level 4 (or higher)
+        pattern = re.compile(rf"^#{{4,6}}\s*{re.escape(sec_name)}\s*$", re.MULTILINE)
+        if not pattern.search(body):
+            missing.append(sec_name)
+    return {
+        "passed": len(missing) == 0,
+        "missing": missing,
+    }
 
 
 # ===========================================================================
@@ -524,8 +521,8 @@ def run_hard_gates(
     # H2: Structural Coverage
     results["H2"] = check_structural_coverage(merged_md, coverage_checklist)
 
-    # H3: Character Floors
-    results["H3"] = check_char_floors(merged_md)
+    # H3: Section existence (v2 — replaces char-floor check)
+    results["H3"] = check_sections_exist(merged_md)
 
     # H4: Table Count — permanently skipped (tables are now selectively extracted)
     results["H4"] = dict(_SKIPPED)
