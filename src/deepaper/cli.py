@@ -211,6 +211,17 @@ def save(
         papers_dir, force=True, category=category,
     )
 
+    # v2.1: copy extracted figure images to paper assets directory
+    from deepaper.pipeline_io import ensure_run_dir
+    run_dir = ensure_run_dir(root, real_id)
+    figures_src = run_dir / "figures"
+    if figures_src.exists() and any(figures_src.glob("*.png")):
+        import shutil
+        assets_dir = note_path.parent / "assets"
+        assets_dir.mkdir(exist_ok=True)
+        for png in figures_src.glob("*.png"):
+            shutil.copy2(png, assets_dir / png.name)
+
     try:
         rel_path = str(note_path.relative_to(root))
     except ValueError:

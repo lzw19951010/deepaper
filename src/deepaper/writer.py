@@ -140,7 +140,12 @@ def write_paper_note(
         FileExistsError: If a note for this arxiv_id already exists and force=False.
     """
     sanitized = sanitize_filename(metadata["title"], metadata["arxiv_id"])
-    dest = output_dir / category / f"{sanitized}.md"
+    category_dir = output_dir / category
+
+    # v2.1: P2 layout — each paper gets its own directory
+    paper_dir = category_dir / sanitized
+    paper_dir.mkdir(parents=True, exist_ok=True)
+    dest = paper_dir / f"{sanitized}.md"
 
     existing = find_existing(metadata["arxiv_id"], output_dir)
 
@@ -183,6 +188,5 @@ def write_paper_note(
         # Remove old file (may be in a different directory/category)
         existing.unlink(missing_ok=True)
 
-    dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(full_content, encoding="utf-8")
     return dest

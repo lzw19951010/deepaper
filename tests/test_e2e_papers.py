@@ -298,8 +298,9 @@ class TestWriteRealPapers:
             fm, body, ARXIV_METADATA_TIGER, ["test"], tmp_path,
             category="recsys/generative-rec",
         )
-        assert path.parent.name == "generative-rec"
-        assert path.parent.parent.name == "recsys"
+        # P2 layout: path.parent = slug dir, path.parent.parent = category leaf
+        assert path.parent.parent.name == "generative-rec"
+        assert path.parent.parent.parent.name == "recsys"
 
 
 # ---------------------------------------------------------------------------
@@ -382,8 +383,9 @@ class TestMiniCPM:
             tmp_path, category="llm/pretraining",
         )
         assert path.exists()
-        assert path.parent.name == "pretraining"
-        assert path.parent.parent.name == "llm"
+        # P2 layout: path.parent = slug dir, path.parent.parent = category leaf
+        assert path.parent.parent.name == "pretraining"
+        assert path.parent.parent.parent.name == "llm"
 
         content = path.read_text(encoding="utf-8")
         fm_end = content.find("---", 3)

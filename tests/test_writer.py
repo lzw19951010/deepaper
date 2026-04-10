@@ -214,9 +214,14 @@ def test_write_paper_note_creates_file(tmp_path: Path) -> None:
     assert "authors" not in fm
     assert "keywords" not in fm
 
-    # Check category-based subdirectory (llm/pretraining)
-    assert path.parent.name == "pretraining"
-    assert path.parent.parent.name == "llm"
+    # Check P2 layout: category/slug/slug.md
+    # path.parent = slug dir (e.g. "test-paper-a-survey-of-testing")
+    # path.parent.parent = category leaf dir (e.g. "pretraining")
+    # path.parent.parent.parent = category root (e.g. "llm")
+    assert path.parent.parent.name == "pretraining"
+    assert path.parent.parent.parent.name == "llm"
+    # slug dir name must match the file stem
+    assert path.parent.name == path.stem
 
     # Check body sections are present (written by Claude, passed through as-is)
     assert "## 核心速览 (Executive Summary)" in content
@@ -258,6 +263,37 @@ def test_write_paper_note_force_overwrites(tmp_path: Path) -> None:
     fm_end = content.find("---", 3)
     fm = yaml.safe_load(content[3:fm_end])
     assert fm["arxiv_id"] == "2301.00001"
+
+
+def test_write_paper_note_p2_directory(tmp_path):
+    """write_paper_note creates slug/ subdirectory in P2 layout."""
+    from deepaper.writer import write_paper_note
+
+    analysis_fm = {
+        "title": "Test Paper",
+        "arxiv_id": "2512.99999",
+        "tldr": "A test with 3.5 and 99.2 numbers.",
+        "tags": ["test"],
+    }
+    analysis_body = "#### 核心速览\nTest content."
+    metadata = {"title": "Test Paper", "arxiv_id": "2512.99999",
+                 "date": "2025-01-01", "url": "https://arxiv.org/abs/2512.99999"}
+
+    papers_dir = tmp_path / "papers"
+    papers_dir.mkdir()
+
+    note_path = write_paper_note(
+        analysis_fm, analysis_body, metadata, ["test"],
+        papers_dir, force=True, category="test",
+    )
+
+    # P2: file should be inside a slug directory
+    assert note_path.name.endswith(".md")
+    assert note_path.exists()
+    # The parent should be the slug directory, not the category directory
+    assert note_path.parent.parent.name == "test"  # category dir
+    # slug dir name matches file stem
+    assert note_path.parent.name == note_path.stem
 
 
 def test_write_paper_note_with_quality_fields(tmp_path):

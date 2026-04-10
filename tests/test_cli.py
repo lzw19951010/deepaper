@@ -147,7 +147,7 @@ class TestSave:
         )
         result = self._invoke_save(tmp_path, md, ["--category", "llm/pretraining"])
         assert result.exit_code == 0
-        notes = list((tmp_path / "papers" / "llm" / "pretraining").glob("*.md"))
+        notes = list((tmp_path / "papers" / "llm" / "pretraining").glob("**/*.md"))
         assert len(notes) == 1
         content = notes[0].read_text(encoding="utf-8")
         assert "Test 96.2% AIME" in content
@@ -157,7 +157,7 @@ class TestSave:
         md = "---\ntags:\n  - scaling\n  - LLM\n---\n\n#### Body"
         result = self._invoke_save(tmp_path, md)
         assert result.exit_code == 0
-        notes = list((tmp_path / "papers" / "misc").glob("*.md"))
+        notes = list((tmp_path / "papers" / "misc").glob("**/*.md"))
         fm = yaml.safe_load(notes[0].read_text()[3:notes[0].read_text().find("---", 3)])
         assert fm["tags"] == ["scaling", "LLM"]
 
@@ -165,7 +165,7 @@ class TestSave:
         result = self._invoke_save(tmp_path, "---\ntags:\n  - old\n---\n\n#### Body",
                                    ["--tags", "new-1,new-2"])
         assert result.exit_code == 0
-        notes = list((tmp_path / "papers" / "misc").glob("*.md"))
+        notes = list((tmp_path / "papers" / "misc").glob("**/*.md"))
         fm = yaml.safe_load(notes[0].read_text()[3:notes[0].read_text().find("---", 3)])
         assert fm["tags"] == ["new-1", "new-2"]
 
@@ -176,7 +176,7 @@ class TestSave:
     def test_save_no_frontmatter(self, tmp_path: Path) -> None:
         result = self._invoke_save(tmp_path, "## Raw markdown\n\nNo YAML.", ["--category", "misc"])
         assert result.exit_code == 0
-        notes = list((tmp_path / "papers" / "misc").glob("*.md"))
+        notes = list((tmp_path / "papers" / "misc").glob("**/*.md"))
         content = notes[0].read_text(encoding="utf-8")
         assert "Raw markdown" in content
         assert "2301.00001" in content
