@@ -163,6 +163,30 @@ def gates_to_constraints(
         lines.append("- 可附 ≤1 句比喻或语境补充，写在 `— ` 后")
         lines.append("- 编号支持未来跨论文引用，不要省略 `[Cx]` 前缀")
 
+    # --- Depth requirements (v2.1) — only for 第一性原理分析 and 技术精要 ---
+    depth_sections = {"第一性原理分析", "技术精要"}
+    if depth_sections & set(sections):
+        lines.append("\n**深度要求（v2.1，硬性约束）：**")
+        lines.append("本章节必须包含以下 3 种深度信号中的至少 2 种：")
+        lines.append('- **D1. 反事实推理** — 对至少 1 个核心设计决策，说明\u201c如果不这么做会怎样\u201d')
+        lines.append("- **D2. 怀疑性批判** — 对至少 1 个数字/结论，指出 fine print 或度量偏差")
+        lines.append("- **D3. 实现层细节** — 对至少 1 个核心机制，写出论文正文外的具体实现参数")
+        lines.append("- 禁止教科书式背景知识（不解释 DPO / GRPO 等基本概念）")
+
+    # --- Figure embed constraints (v2.1) ---
+    if core_figures:
+        fig_ids_str = ", ".join(f"figure-{cf['id']}" for cf in core_figures)
+        if "技术精要" in sections:
+            # Hard requirement for writer-technical
+            lines.append("\n**图片嵌入约束（v2.1，H11 gate 验证）：**")
+            lines.append(f"你负责嵌入所有 core figure: {fig_ids_str}")
+            lines.append("每个 figure 用图片语法 `![Figure N — 简短caption](./assets/figure-N.png)` 至少嵌入 1 次")
+            lines.append("裸文本引用 `Figure N 展示了...` 不算嵌入")
+        else:
+            # Soft suggestion for other writers
+            lines.append("\n**图片嵌入建议（可选）：**")
+            lines.append("如需引用 core figure 作证据，可用 `![Figure N — ...](./assets/figure-N.png)` 嵌入")
+
     return "\n".join(lines)
 
 

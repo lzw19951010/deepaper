@@ -470,3 +470,52 @@ class TestGatesToConstraintsV2:
     def test_compute_scaling_factor_deleted(self):
         from deepaper import prompt_builder
         assert not hasattr(prompt_builder, "compute_scaling_factor")
+
+
+def test_depth_requirement_in_principle_writer():
+    """writer-principle prompt must contain D1/D2/D3 depth requirement."""
+    from deepaper.prompt_builder import auto_split, generate_writer_prompt, \
+        parse_template_sections, gates_to_constraints
+    from deepaper.defaults import DEFAULT_TEMPLATE
+
+    tasks = auto_split({})
+    principle_task = [t for t in tasks if t.name == "writer-principle"][0]
+    sections = parse_template_sections(DEFAULT_TEMPLATE)
+    constraints = gates_to_constraints(principle_task.sections, {}, {}, [])
+
+    prompt = generate_writer_prompt(
+        task=principle_task, run_dir="/tmp/test", template_sections=sections,
+        system_role="", figure_contexts={}, constraints=constraints,
+        pdf_path="", table_def_pages=[],
+    )
+    assert "D1." in prompt
+    assert "D2." in prompt
+
+
+def test_depth_not_in_overview_writer():
+    """writer-overview should NOT have depth requirements (it's a TL;DR section)."""
+    from deepaper.prompt_builder import auto_split, gates_to_constraints
+    from deepaper.defaults import DEFAULT_TEMPLATE
+
+    tasks = auto_split({})
+    overview_task = [t for t in tasks if t.name == "writer-overview"][0]
+    constraints = gates_to_constraints(overview_task.sections, {}, {}, [])
+    assert "D1." not in constraints
+
+
+def test_figure_embed_constraint_in_technical_writer():
+    """writer-technical prompt must require image syntax for core figures."""
+    from deepaper.prompt_builder import auto_split, gates_to_constraints
+
+    tasks = auto_split({})
+    tech_task = [t for t in tasks if t.name == "writer-technical"][0]
+    core_figs = [{"key": "Figure_1", "id": 1, "page": 3}]
+    constraints = gates_to_constraints(tech_task.sections, {}, {}, core_figs)
+    assert "./assets/figure-" in constraints
+    assert "figure-1" in constraints
+
+
+def test_compact_confusion_format_in_template():
+    """DEFAULT_TEMPLATE must use v2.1 compact confusion format with 🚨."""
+    from deepaper.defaults import DEFAULT_TEMPLATE
+    assert "🚨" in DEFAULT_TEMPLATE
