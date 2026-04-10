@@ -429,7 +429,51 @@ def compute_paper_profile(
         "num_tables": num_tables,
         "num_figures": num_figures,
         "num_equations": num_equations,
+        "top_level_sections": _compute_top_level_sections(text_by_page),
     }
+
+
+def _compute_top_level_sections(
+    text_by_page: dict[int, str],
+) -> list[dict]:
+    """Extract top-level section boundaries with page ranges.
+
+    Returns list of {title, page_start, page_end} dicts sorted by page_start.
+    """
+    page_section: list[tuple[int, str]] = []
+    for page in sorted(text_by_page.keys()):
+        text = text_by_page[page]
+        for m in _SECTION_RE.finditer(text):
+            canonical = _canonical_section(m.group(1).strip())
+            page_section.append((page, canonical))
+            break  # only first heading per page
+
+    if not page_section:
+        return []
+
+    # Deduplicate: keep first occurrence of each canonical name
+    seen: set[str] = set()
+    unique: list[tuple[int, str]] = []
+    for page, name in page_section:
+        if name not in seen:
+            seen.add(name)
+            unique.append((page, name))
+
+    # Build page ranges
+    max_page = max(text_by_page.keys())
+    sections: list[dict] = []
+    for i, (page_start, name) in enumerate(unique):
+        if i + 1 < len(unique):
+            page_end = unique[i + 1][0] - 1
+        else:
+            page_end = max_page
+        sections.append({
+            "title": name,
+            "page_start": page_start,
+            "page_end": page_end,
+        })
+
+    return sections
 
 
 def _compute_section_chars(text_by_page: dict[int, str]) -> dict[str, int]:

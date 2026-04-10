@@ -202,6 +202,31 @@ class TestPaperProfile:
         assert "Experiments" in section_chars
 
 
+def test_compute_paper_profile_top_level_sections():
+    """compute_paper_profile must return top_level_sections with page ranges."""
+    from deepaper.registry import compute_paper_profile
+
+    # Minimal 3-page paper: Abstract on p1, Method on p2, Experiments on p3
+    text_by_page = {
+        1: "Abstract\nThis paper presents...",
+        2: "3 Method\nWe propose a novel approach...",
+        3: "4 Experiments\nWe evaluate on three benchmarks...",
+    }
+    profile = compute_paper_profile(text_by_page, {})
+    sections = profile.get("top_level_sections", [])
+
+    assert len(sections) >= 2, f"Expected ≥2 sections, got {sections}"
+    names = [s["title"] for s in sections]
+    assert "Abstract" in names
+    assert "Method" in names or "Experiments" in names
+
+    # Each section must have page_start and page_end
+    for s in sections:
+        assert "page_start" in s, f"Missing page_start in {s}"
+        assert "page_end" in s, f"Missing page_end in {s}"
+        assert s["page_start"] <= s["page_end"]
+
+
 # ===========================================================================
 # TestCoreTables
 # ===========================================================================
